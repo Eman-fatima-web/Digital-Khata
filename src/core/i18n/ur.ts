@@ -249,5 +249,12 @@ export const ur = {
     actionReminder: 'یاد دہانی بھیجیں',
     cancelled: 'منسوخ — کوئی تبدیلی نہیں کی گئی۔',
     confirmed: 'تصدیق شدہ',
+    voiceOutput: {
+      speak: 'جواب سنائیں',
+      stop: 'سننا بند کریں',
+      speaking: 'سن رہے ہیں...',
+      unavailable: 'آواز کی آؤٹ پٹ دستیاب نہیں ہے',
+      error: 'جواب سنانے میں مسئلہ',
+    },
   },
 }

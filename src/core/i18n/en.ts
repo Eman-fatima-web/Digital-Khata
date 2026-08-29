@@ -249,6 +249,13 @@ export const en = {
     actionReminder: 'Send Reminder',
     cancelled: 'Cancelled — no changes were made.',
     confirmed: 'Confirmed',
+    voiceOutput: {
+      speak: 'Speak response',
+      stop: 'Stop speaking',
+      speaking: 'Speaking...',
+      unavailable: 'Voice output not available',
+      error: 'Could not speak response',
+    },
   },
 } as const
 

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Brain, Mic, MicOff, Send, Sparkles, Wifi, WifiOff } from 'lucide-react'
+import { Brain, Mic, MicOff, Send, Sparkles, Wifi, WifiOff, Volume2, X } from 'lucide-react'
 
 import { useCustomers, usePayments, useSales, useUdhaar } from '../../hooks/useKhataData'
 import { useNetwork } from '../../hooks/useNetwork'
 import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
+import { useVoiceOutput } from '../../hooks/useVoiceOutput'
 import { CloudAIAdapter, askAI } from '../../features/ai/adapters'
 import { getResponses } from '../../features/ai/responses'
 import type { ActionKind, ActionProposal, AIResult } from '../../features/ai/types'
@@ -72,7 +73,23 @@ function UserBubble({ text, time }: { text: string; time: string }) {
   )
 }
 
-function AiBubble({ text, time, children }: { text: string; time?: string; children?: ReactNode }) {
+function AiBubble({ 
+  text, 
+  time, 
+  children,
+  messageId,
+  isSpeaking = false,
+  onSpeak,
+  voiceAvailable = false,
+}: { 
+  text: string
+  time?: string
+  children?: ReactNode
+  messageId?: string
+  isSpeaking?: boolean
+  onSpeak?: (messageId: string, text: string) => void
+  voiceAvailable?: boolean
+}) {
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="flex max-w-[85%] items-start gap-2.5 sm:max-w-[75%]">
@@ -81,6 +98,31 @@ function AiBubble({ text, time, children }: { text: string; time?: string; child
         </div>
         <div className="min-w-0 rounded-2xl rounded-ss-md border border-surface-hairline bg-surface-card px-4 py-3 text-sm leading-6 text-ink shadow-sm">
           <p className="whitespace-pre-line">{text}</p>
+          {messageId && voiceAvailable && onSpeak && (
+            <button
+              type="button"
+              onClick={() => onSpeak(messageId, text)}
+              className={cn(
+                'mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition',
+                isSpeaking
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-surface-hover text-ink-muted hover:text-primary-600',
+              )}
+              aria-label={isSpeaking ? 'Stop speaking' : 'Speak response'}
+            >
+              {isSpeaking ? (
+                <>
+                  <X size={13} />
+                  Stop
+                </>
+              ) : (
+                <>
+                  <Volume2 size={13} />
+                  Speak
+                </>
+              )}
+            </button>
+          )}
           {children}
         </div>
       </div>
@@ -100,6 +142,10 @@ function AI() {
   const sales = useSales()
 
   const cloudAvailable = useMemo(() => new CloudAIAdapter().isAvailable(), [])
+
+  // Voice output
+  const voice = useVoiceOutput()
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null)
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -367,6 +413,33 @@ function AI() {
     void updateAIMessageState(messageId, 'cancelled')
   }
 
+  const handleSpeak = async (messageId: string, text: string) => {
+    if (speakingMessageId) {
+      // Stop current speech
+      voice.stop()
+      setSpeakingMessageId(null)
+      return
+    }
+
+    // Start speaking
+    setSpeakingMessageId(messageId)
+    const voiceLanguage = language === 'ur' ? 'ur' : 'en'
+    const success = await voice.speak(text, voiceLanguage)
+
+    if (!success && voice.state !== 'speaking') {
+      // Speech failed or not available
+      setSpeakingMessageId(null)
+    } else {
+      // Wait for speech to finish
+      const checkInterval = setInterval(() => {
+        if (!voice.isSpeaking()) {
+          setSpeakingMessageId(null)
+          clearInterval(checkInterval)
+        }
+      }, 100)
+    }
+  }
+
   const actionLabels: Record<ActionKind, string> = {
     RECORD_PAYMENT: t('ai.actionPayment'),
     ADD_UDHAAR: t('ai.actionUdhaar'),
@@ -456,8 +529,12 @@ function AI() {
           ) : (
             <AiBubble
               key={message.id}
+              messageId={message.id}
               text={message.text}
               time={formatTime(message.createdAt)}
+              isSpeaking={speakingMessageId === message.id}
+              onSpeak={voice.isAvailable() ? handleSpeak : undefined}
+              voiceAvailable={voice.isAvailable()}
             >
               {message.proposal && (
                 <ConfirmCard
