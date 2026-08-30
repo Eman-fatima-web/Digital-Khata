@@ -156,3 +156,25 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+/* Scroll normally with mouse wheel/touch, but keep scrollbar visually hidden */
+html,
+body {
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* Reusable: hide the scrollbar of any scroll container without disabling scrolling */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

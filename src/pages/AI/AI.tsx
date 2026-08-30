@@ -493,7 +493,7 @@ function AI() {
   ]
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-200px)] min-h-[430px] w-full max-w-3xl flex-col lg:h-[calc(100dvh-125px)]">
+    <div className="mx-auto flex min-h-0 h-[calc(100dvh-200px)] w-full max-w-3xl flex-col lg:h-[calc(100dvh-125px)]">
       <section className="flex items-center justify-between gap-3 rounded-2xl border border-surface-hairline bg-surface-card px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
@@ -516,7 +516,7 @@ function AI() {
         </span>
       </section>
 
-      <div ref={scrollRef} className="mt-4 flex-1 space-y-4 overflow-y-auto pe-1">
+      <div ref={scrollRef} className="no-scrollbar mt-4 flex-1 space-y-4 overflow-y-auto pe-1">
         <AiBubble text={t('ai.welcome')} />
 
         {messages.map((message) =>
@@ -581,7 +581,7 @@ function AI() {
         )}
       </div>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion}

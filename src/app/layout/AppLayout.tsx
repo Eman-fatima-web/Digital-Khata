@@ -24,7 +24,9 @@ export function AppLayout() {
   const handleAddSale = () => navigate('/sales?add=true')
 
   return (
-    <div className="gradient-bg min-h-screen overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden">
+      {/* Decorative background must stay a separate fixed layer; a fixed root container would pin all content to the viewport and kill page scrolling. */}
+      <div className="gradient-bg" aria-hidden="true" />
       <Header />
       <DesktopSidebar />
 
