@@ -9,12 +9,14 @@ import type {
 } from '../../core/types'
 import { db } from '../db/db'
 import type { CloudProvider } from '../cloud/CloudProvider'
+import type { SyncConflict } from '../cloud/CloudProvider'
 import { restCloudProvider } from '../cloud/restCloudProvider'
 import {
   getPendingActions,
   markActionFailed,
   markActionSucceeded,
 } from '../repositories/syncQueueRepo'
+import { saveSyncConflict } from '../repositories/syncConflictRepo'
 import { getLastSyncAt, networkService, setLastSyncAt } from './networkService'
 
 const RETRY_DELAYS = [1000, 2000, 5000, 10000, 30000]
@@ -78,7 +80,7 @@ class SyncService {
           this.setState('error')
           return false
         }
-        await this.handlePushSuccess(pending)
+        await this.handlePushSuccess(pending, pushResult.conflicts ?? [])
       }
 
       const since = getLastSyncAt()
@@ -99,8 +101,16 @@ class SyncService {
     }
   }
 
-  private async handlePushSuccess(actions: SyncAction[]): Promise<void> {
+  private async handlePushSuccess(actions: SyncAction[], conflicts: SyncConflict[]): Promise<void> {
+    const conflictKeys = new Set(conflicts.map((conflict) => `${conflict.table}:${conflict.recordId}`))
+
+    for (const conflict of conflicts) {
+      const local = await this.getRecord(conflict.table, conflict.recordId)
+      if (local) await saveSyncConflict(conflict.table, local, conflict.remote)
+    }
+
     for (const action of actions) {
+      if (conflictKeys.has(`${action.table}:${action.recordId}`)) continue
       await this.markRecordSynced(action.table, action.recordId)
       await markActionSucceeded(action.id)
     }
@@ -180,22 +190,43 @@ class SyncService {
       return
     }
 
-    // Preserve pending local changes.
-    if (local.syncStatus === 'pending') {
+    if (local.syncStatus === 'pending' || local.syncStatus === 'conflict') {
+      await saveSyncConflict(remoteTableName(table), local, remote)
       return
     }
 
-    // Conflict: remote is newer.
-    if (new Date(remote.updatedAt) > new Date(local.updatedAt)) {
+    if (sameRecord(local, remote)) return
+
+    // A strictly newer remote record is safe to apply only when this device has
+    // no unsynced edit. Any competing or ambiguous version is held for review.
+    if (remote.version > local.version && new Date(remote.updatedAt) > new Date(local.updatedAt)) {
       await table.put(remote)
       return
     }
 
-    // Local is newer: mark conflict for user review.
-    if (new Date(remote.updatedAt) < new Date(local.updatedAt)) {
-      await table.update(remote.id, { syncStatus: 'conflict' } as Partial<T>)
-    }
+    await saveSyncConflict(remoteTableName(table), local, remote)
   }
+
+  private async getRecord(table: KhataTable, recordId: string): Promise<KhataEntity | undefined> {
+    const tables = {
+      customers: db.customers,
+      udhaar: db.udhaar,
+      payments: db.payments,
+      sales: db.sales,
+    }
+    return tables[table].get(recordId) as Promise<KhataEntity | undefined>
+  }
+}
+
+function sameRecord(left: KhataEntity, right: KhataEntity): boolean {
+  return left.version === right.version && left.updatedAt === right.updatedAt && left.isDeleted === right.isDeleted
+}
+
+function remoteTableName(table: unknown): KhataTable {
+  if (table === db.customers) return 'customers'
+  if (table === db.udhaar) return 'udhaar'
+  if (table === db.payments) return 'payments'
+  return 'sales'
 }
 
 export const syncService = new SyncService()

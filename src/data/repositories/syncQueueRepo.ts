@@ -29,6 +29,13 @@ export async function markActionSucceeded(actionId: string): Promise<void> {
   await db.syncQueue.delete(actionId)
 }
 
+export async function removeActionsForRecord(table: KhataTable, recordId: string): Promise<void> {
+  const actions = await db.syncQueue
+    .filter((action) => action.table === table && action.recordId === recordId)
+    .toArray()
+  await Promise.all(actions.map((action) => db.syncQueue.delete(action.id)))
+}
+
 export async function markActionFailed(
   actionId: string,
   error: string,
