@@ -213,7 +213,7 @@ export const en = {
   },
   ai: {
     title: 'Khata AI Assistant',
-    subtitle: 'Ask questions or give commands in English or Roman Urdu.',
+    subtitle: 'Ask questions or give commands in English, Urdu, or Roman Urdu.',
     placeholder: 'Type or speak your question...',
     welcome:
       "Assalam-o-Alaikum! I'm Khata AI, your business assistant. Ask me about balances, sales or overdue payments — or give commands like \"Ahmed ki 2000 payment receive kar lo\".",
