@@ -24,11 +24,11 @@ export function AppLayout() {
   const handleAddSale = () => navigate('/sales?add=true')
 
   return (
-    <div className="gradient-bg min-h-screen">
+    <div className="gradient-bg min-h-screen overflow-x-hidden">
       <Header />
       <DesktopSidebar />
 
-      <main className="mx-auto min-h-[calc(100vh-64px)] max-w-7xl px-4 pb-28 pt-4 lg:ps-72 lg:pb-8">
+      <main className="mx-auto min-h-[calc(100vh-64px)] min-w-0 max-w-7xl px-4 pb-28 pt-4 lg:ps-72 lg:pb-8">
         {/* Keyed by pathname so a crash or lazy load resets per route. */}
         <ErrorBoundary key={location.pathname}>
           <Suspense fallback={<PageLoader />}>

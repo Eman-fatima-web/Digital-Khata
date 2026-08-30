@@ -12,7 +12,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           key={lang.code}
           onClick={() => setLanguage(lang.code)}
           className={cn(
-            'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+            'min-h-11 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:min-h-0 sm:px-3',
             language === lang.code
               ? 'bg-surface-card text-primary-500 shadow-sm'
               : 'text-ink-muted hover:text-ink',

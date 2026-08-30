@@ -43,7 +43,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl font-semibold sm:min-h-0',
         'transition-colors focus:outline-none focus:ring-4 focus:ring-offset-0',
         'disabled:cursor-not-allowed disabled:opacity-50',
         variantClasses[variant],

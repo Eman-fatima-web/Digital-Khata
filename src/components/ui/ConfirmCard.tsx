@@ -42,7 +42,7 @@ export function ConfirmCard({
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-4 text-sm">
             <span className="shrink-0 text-ink-muted">{row.label}</span>
-            <span className="text-end font-semibold text-ink">{row.value}</span>
+            <span className="min-w-0 break-words text-end font-semibold text-ink">{row.value}</span>
           </div>
         ))}
 
@@ -56,7 +56,7 @@ export function ConfirmCard({
                 type="button"
                 onClick={onConfirm}
                 className={cn(
-                  'flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition',
+                  'min-h-11 flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition',
                   danger
                     ? 'bg-danger hover:opacity-90'
                     : 'bg-success-500 hover:bg-success-600',
@@ -67,7 +67,7 @@ export function ConfirmCard({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
+                className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
               >
                 <X size={15} />
                 {cancelLabel}
