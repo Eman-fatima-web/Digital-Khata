@@ -231,3 +231,53 @@ export function isInPeriod(dateStr: string, period: Period): boolean {
 }
 
 export function localToday(): string { return localDateKey() }
+
+const PRONOUNS = [
+  'us ne', 'us ko', 'us ka', 'us ki', 'uske', 'uski', 'uska', 'usse',
+  'woh', 'wo', 'ye', 'yeh', 'inhone', 'inho ne', 'inhon ne', 'unko', 'unki', 'unka',
+  'him', 'her', 'them', 'he', 'she', 'it', 'they',
+  'that customer', 'the same', 'same customer', 'usko', 'usne',
+  'اس نے', 'اس کو', 'اس کا', 'اس کی', 'وہ', 'یہ', 'انہوں نے', 'ان کو',
+]
+
+export function detectPronoun(input: string): boolean {
+  const norm = normalize(input)
+  return PRONOUNS.some((pronoun) => norm.includes(pronoun))
+}
+
+const CUSTOMER_ACTION_PATTERNS = [
+  /\b(?:naya|nayi|new|add|create|banao|banado|banai|bana)\s+(?:customer|gahak|گاہک|customer)/i,
+  /\b(?:customer|gahak|گاہک)\s+(?:add|create|banao|banado|banai|bana|naya|nayi|new)/i,
+  /\bنیا\s+گاہک\b/,
+  /\bگاہک\s+(?:بنائ|بناؤ|شامل)\b/,
+]
+
+export function detectNewCustomer(input: string): { name: string; phone?: string } | undefined {
+  const norm = normalize(input)
+  const isCustomerAction = CUSTOMER_ACTION_PATTERNS.some((pattern) => pattern.test(norm))
+  if (!isCustomerAction) return undefined
+
+  const tokens = norm.split(/\s+/).filter((token) => token && !STOPWORDS.has(token))
+  const actionWords = new Set(['naya', 'nayi', 'new', 'add', 'create', 'banao', 'banado', 'banai', 'bana', 'customer', 'gahak', 'نیا', 'گاہک'])
+  const nameTokens = tokens.filter((token) => !actionWords.has(token) && !/^\d+$/.test(token))
+
+  if (nameTokens.length === 0) return undefined
+
+  const phoneMatch = norm.match(/(?:phone|number|no|num|فون|نمبر)?\s*[:+]?\s*(\d{10,15})/)
+  const phone = phoneMatch ? phoneMatch[1] : undefined
+
+  return { name: nameTokens.join(' '), phone }
+}
+
+const GREETING_PATTERNS = [
+  /\b(?:assalam|salam|slm|hello|hi|hey|good\s*(?:morning|afternoon|evening)|aoa)\b/i,
+  /\bسلام\b/,
+  /\bالسلام\s+علیکم\b/,
+  /\bآداب\b/,
+  /\bہیلو\b/,
+]
+
+export function detectGreeting(input: string): boolean {
+  const norm = normalize(input)
+  return GREETING_PATTERNS.some((pattern) => pattern.test(norm))
+}

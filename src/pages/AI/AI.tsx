@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Brain, Mic, MicOff, Send, Sparkles, Wifi, WifiOff, Volume2, X } from 'lucide-react'
+import { Brain, Mic, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 
 import { useCustomers, usePayments, useSales, useUdhaar } from '../../hooks/useKhataData'
 import { useNetwork } from '../../hooks/useNetwork'
 import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
 import { useVoiceOutput } from '../../hooks/useVoiceOutput'
-import { CloudAIAdapter, askAI } from '../../features/ai/adapters'
+import { CloudAIAdapter } from '../../features/ai/adapters'
 import { getResponses } from '../../features/ai/responses'
-import type { ActionKind, ActionProposal, AIResult } from '../../features/ai/types'
+import type { ActionKind, ActionProposal, AIResult, ConversationContext, KhataSnapshot } from '../../features/ai/types'
+import type { TranslationKey } from '../../core/i18n'
+import { createEmptyContext, processInput } from '../../features/ai/orchestrator'
+import { getInsightHeadlines } from '../../features/ai/insights'
+import {
+  addCustomer,
+} from '../../data/repositories/customerRepo'
+import {
+  addSale,
+} from '../../data/repositories/saleRepo'
 import {
   addPayment,
   deletePayment,
@@ -131,6 +140,39 @@ function AiBubble({
   )
 }
 
+function ProactiveInsightChips({
+  data,
+  language,
+  t,
+  onSend,
+}: {
+  data: KhataSnapshot
+  language: 'en' | 'ur'
+  t: (key: TranslationKey) => string
+  onSend: (text: string) => void
+}) {
+  const headlines = getInsightHeadlines(data, language)
+  if (headlines.length === 0) return null
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-ink-muted">{t('ai.proactive.title')}</p>
+      <div className="flex flex-wrap gap-2">
+        {headlines.slice(0, 3).map((headline, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSend(headline)}
+            className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:bg-primary-100"
+          >
+            {headline}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function AI() {
   const { t, language } = useTranslation()
   const owner = useOwner()
@@ -151,9 +193,12 @@ function AI() {
   const [input, setInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [listening, setListening] = useState(false)
+  const [autoSpeak, setAutoSpeakState] = useState(false)
+  const [lastIntent, setLastIntent] = useState<string | undefined>(undefined)
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const contextRef = useRef<ConversationContext>(createEmptyContext())
 
   useEffect(() => {
     const el = scrollRef.current
@@ -233,19 +278,21 @@ function AI() {
 
     let result: AIResult
     try {
-      result = await askAI(
+      const { result: orchestratorResult, updatedContext } = await processInput(
+        text,
+        contextRef.current,
         {
-          input: text,
-          data: {
-            customers: customers ?? [],
-            udhaar: udhaar ?? [],
-            payments: payments ?? [],
-            sales: sales ?? [],
-          },
-          language,
+          customers: customers ?? [],
+          udhaar: udhaar ?? [],
+          payments: payments ?? [],
+          sales: sales ?? [],
         },
+        language,
         isOnline,
       )
+      result = orchestratorResult
+      contextRef.current = updatedContext
+      setLastIntent(updatedContext.lastIntent)
     } catch {
       result = { type: 'answer', text: getResponses(language).actionFailed() }
     }
@@ -257,9 +304,12 @@ function AI() {
     if (result.type === 'proposal') {
       pushMessage('ai', result.text, result.proposal)
     } else if (result.type === 'fallback') {
-      pushMessage('ai', getResponses(language).fallback(isOnline, cloudAvailable))
+      const fallbackText = getResponses(language).fallback(isOnline, cloudAvailable)
+      pushMessage('ai', fallbackText)
+      if (autoSpeak) void voice.speak(fallbackText, language === 'ur' ? 'ur' : 'en')
     } else {
       pushMessage('ai', result.text)
+      if (autoSpeak) void voice.speak(result.text, language === 'ur' ? 'ur' : 'en')
     }
   }
 
@@ -379,6 +429,30 @@ function AI() {
         )
         return win ? r.successReminder(proposal.customerName as string) : r.reminderFailed()
       }
+
+      case 'CREATE_CUSTOMER': {
+        const customer = await addCustomer(
+          {
+            name: proposal.customerName as string,
+            phone: proposal.customerPhone ?? '',
+          },
+          owner,
+        )
+        return r.successCreateCustomer(customer.name)
+      }
+
+      case 'RECORD_SALE': {
+        await addSale(
+          {
+            customerId: proposal.customerId,
+            amount: proposal.amount as number,
+            description: proposal.description as string,
+            date: proposal.date ?? today,
+          },
+          owner,
+        )
+        return r.successSale(proposal.customerName ?? '', proposal.amount as number)
+      }
     }
   }
 
@@ -397,6 +471,12 @@ function AI() {
       )
       void updateAIMessageState(messageId, 'confirmed')
       pushMessage('ai', text)
+      // Focus management: scroll to the new response
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      }, 100)
     } catch (error) {
       console.error('Khata AI action failed:', error)
       setMessages((prev) =>
@@ -446,6 +526,8 @@ function AI() {
     DELETE_UDHAAR: t('ai.actionDeleteUdhaar'),
     DELETE_PAYMENT: t('ai.actionDeletePayment'),
     SEND_REMINDER: t('ai.actionReminder'),
+    CREATE_CUSTOMER: t('ai.actionCreateCustomer'),
+    RECORD_SALE: t('ai.actionRecordSale'),
   }
 
   const buildRows = (proposal: ActionProposal) => {
@@ -484,13 +566,38 @@ function AI() {
       : { icon: Wifi, label: t('ai.onlineStatus'), className: 'bg-success-50 text-success-600' }
   const StatusIcon = status.icon
 
-  const suggestions = [
-    t('ai.suggestions.balance'),
-    t('ai.suggestions.topDebtor'),
-    t('ai.suggestions.sales'),
-    t('ai.suggestions.overdue'),
-    t('ai.suggestions.insight'),
-  ]
+  const suggestions = useMemo(() => {
+    const hasOverdue = (udhaar ?? []).some((e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < new Date().toISOString().split('T')[0])
+
+    // Default suggestions for fresh chat
+    if (messages.length <= 1) {
+      return [
+        t('ai.suggestions.balance'),
+        t('ai.suggestions.topDebtor'),
+        t('ai.suggestions.sales'),
+        t('ai.suggestions.overdue'),
+        t('ai.suggestions.insight'),
+      ]
+    }
+
+    // Contextual suggestions based on last intent
+    if (lastIntent === 'CUSTOMER_BALANCE') {
+      return [t('ai.suggestions.sendReminder'), t('ai.suggestions.recordPayment'), t('ai.suggestions.showHistory')]
+    }
+    if (lastIntent === 'RECORD_PAYMENT' || lastIntent === 'ADD_UDHAAR') {
+      return [t('ai.suggestions.addUdhaar'), t('ai.suggestions.viewTotal'), t('ai.suggestions.showHistory')]
+    }
+    if (hasOverdue) {
+      return [t('ai.suggestions.overdueList'), t('ai.suggestions.sendReminder'), t('ai.suggestions.viewTotal')]
+    }
+
+    // Fallback to default
+    return [
+      t('ai.suggestions.balance'),
+      t('ai.suggestions.topDebtor'),
+      t('ai.suggestions.sales'),
+    ]
+  }, [messages.length, udhaar, lastIntent, t])
 
   return (
     <div className="mx-auto flex h-[calc(100dvh-200px)] min-h-[430px] w-full max-w-3xl flex-col lg:h-[calc(100dvh-125px)]">
@@ -505,19 +612,52 @@ function AI() {
             <p className="truncate text-xs text-ink-muted">{t('ai.subtitle')}</p>
           </div>
         </div>
-        <span
-          className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold',
-            status.className,
-          )}
-        >
-          <StatusIcon size={13} />
-          <span className="hidden sm:inline">{status.label}</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !autoSpeak
+              setAutoSpeakState(next)
+              voice.setAutoSpeak(next)
+            }}
+            aria-label={autoSpeak ? t('ai.autoSpeakOn') : t('ai.autoSpeakOff')}
+            title={t('ai.autoSpeak')}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition',
+              autoSpeak ? 'bg-primary-50 text-primary-600' : 'bg-surface text-ink-muted hover:text-ink',
+            )}
+          >
+            {autoSpeak ? <Volume2 size={13} /> : <VolumeX size={13} />}
+            <span className="hidden sm:inline">{autoSpeak ? t('ai.autoSpeakOn') : t('ai.autoSpeakOff')}</span>
+          </button>
+          <span
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold',
+              status.className,
+            )}
+          >
+            <StatusIcon size={13} />
+            <span className="hidden sm:inline">{status.label}</span>
+          </span>
+        </div>
       </section>
 
-      <div ref={scrollRef} className="mt-4 flex-1 space-y-4 overflow-y-auto pe-1">
+      <div ref={scrollRef} role="log" aria-live="polite" className="scrollbar-hidden mt-4 flex-1 space-y-4 overflow-y-auto pe-1">
         <AiBubble text={t('ai.welcome')} />
+
+        {messages.length <= 1 && (
+          <ProactiveInsightChips
+            data={{
+              customers: customers ?? [],
+              udhaar: udhaar ?? [],
+              payments: payments ?? [],
+              sales: sales ?? [],
+            }}
+            language={language}
+            t={t}
+            onSend={sendText}
+          />
+        )}
 
         {messages.map((message) =>
           message.role === 'user' ? (
@@ -581,7 +721,7 @@ function AI() {
         )}
       </div>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+      <div className="scrollbar-hidden mt-3 flex gap-2 overflow-x-auto pb-1">
         {suggestions.map((suggestion) => (
           <button
             key={suggestion}
@@ -597,7 +737,7 @@ function AI() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-3 flex items-center gap-1.5 rounded-2xl border border-surface-hairline bg-surface-card p-1.5 shadow-sm"
+        className="safe-bottom sticky bottom-0 mt-3 flex items-center gap-1.5 rounded-2xl border border-surface-hairline bg-surface-card p-1.5 shadow-sm"
       >
         <input
           value={input}
@@ -612,11 +752,19 @@ function AI() {
           className={cn(
             'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition',
             listening
-              ? 'animate-pulse bg-danger text-white'
+              ? 'bg-danger text-white'
               : 'text-ink-muted hover:bg-surface hover:text-ink',
           )}
         >
-          {listening ? <MicOff size={18} /> : <Mic size={18} />}
+          {listening ? (
+            <span className="flex items-center" aria-label={t('ai.listening')}>
+              <span className="waveform-bar" />
+              <span className="waveform-bar" />
+              <span className="waveform-bar" />
+            </span>
+          ) : (
+            <Mic size={18} />
+          )}
         </button>
         <button
           type="submit"

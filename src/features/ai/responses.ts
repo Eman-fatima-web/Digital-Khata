@@ -59,6 +59,13 @@ type Responses = {
   shareCancelled: () => string
   actionFailed: () => string
   fallback: (online: boolean, cloudAvailable: boolean) => string
+  greeting: () => string
+  help: () => string
+  pronounUnclear: () => string
+  newCustomerProposal: (name: string) => string
+  saleProposal: (name: string, amount: number) => string
+  successCreateCustomer: (name: string) => string
+  successSale: (name: string, amount: number) => string
 }
 
 const en: Responses = {
@@ -147,6 +154,13 @@ const en: Responses = {
     }
     return 'Let me try that with the cloud AI...'
   },
+  greeting: () => 'Wa alaikum assalam! How can I help you with your khata today?',
+  help: () => 'I can help you with:\n• Check customer balances — "Ahmed ka balance batao"\n• Record payments — "Ahmed ki 2000 payment receive kar lo"\n• Add udhaar — "Ahmed ko 5000 udhaar do"\n• Record sales — "Aaj ki sale likho"\n• Create customers — "Naya customer add karo"\n• Check overdue — "Kis ka udhaar overdue hai?"\n• Business insights — "Karobar kaisa chal raha hai?"\n\nJust type or speak naturally in English, Urdu, or Roman Urdu!',
+  pronounUnclear: () => "I'm not sure who you're referring to. Please tell me the customer's name.",
+  newCustomerProposal: (name) => `I'll create a new customer named "${name}". Shall I proceed?`,
+  saleProposal: (name, amount) => `Record a sale of ${formatCurrency(amount)}${name ? ` for ${name}` : ''}?`,
+  successCreateCustomer: (name) => `Done! Customer "${name}" has been created.`,
+  successSale: (name, amount) => `Done! Sale of ${formatCurrency(amount)} recorded${name ? ` for ${name}` : ''}.`,
 }
 
 const ur: Responses = {
@@ -235,6 +249,13 @@ const ur: Responses = {
     }
     return 'کلاؤڈ AI سے پوچھتا ہوں...'
   },
+  greeting: () => 'وعلیکم السلام! میں آپ کے خاتے میں آج آپ کی کیا مدد کر سکتا ہوں؟',
+  help: () => 'میں ان چیزوں میں مدد کر سکتا ہوں:\n• گاہک کا بیلنس دیکھیں — "احمد کا بیلنس بتاؤ"\n• ادائیگی ریکارڈ کریں — "احمد کی 2000 ادائیگی وصول کر لو"\n• ادھار شامل کریں — "احمد کو 5000 ادھار دو"\n• فروخت ریکارڈ کریں — "آج کی فروخت لکھو"\n• نیا گاہک بنائیں — "نیا گاہک شامل کرو"\n• تاخیر شدہ دیکھیں — "کس کا ادھار تاخیر شدہ ہے؟"\n• کاروباری جائزہ — "کاروبار کیسا چل رہا ہے؟"\n\nبس انگریزی، اردو یا رومن اردو میں قدرتی طور پر ٹائپ یا بولیں!',
+  pronounUnclear: () => 'مجھے یقین نہیں کہ آپ کس کا حوالہ دے رہے ہیں۔ براہ کرم گاہک کا نام بتائیں۔',
+  newCustomerProposal: (name) => `میں "${name}" نام کا نیا گاہک بناؤں گا۔ کیا میں آگے بڑھوں؟`,
+  saleProposal: (name, amount) => `${name ? `${name} کے لیے` : ''} ${formatCurrency(amount)} کی فروخت ریکارڈ کروں؟`,
+  successCreateCustomer: (name) => `مکمل! گاہک "${name}" بن گیا ہے۔`,
+  successSale: (name, amount) => `مکمل! ${formatCurrency(amount)} کی فروخت ریکارڈ ہو گئی${name ? ` برائے ${name}` : ''}۔`,
 }
 
 const periodLabels: Record<AILanguage, Record<'today' | 'week' | 'month', string>> = {

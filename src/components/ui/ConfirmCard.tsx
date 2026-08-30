@@ -32,7 +32,7 @@ export function ConfirmCard({
   onCancel,
 }: ConfirmCardProps) {
   return (
-    <div className="mt-3 overflow-hidden rounded-xl border border-warning/30 bg-warning/5">
+    <div role="dialog" aria-modal="false" aria-label={title} className="mt-3 overflow-hidden rounded-xl border border-warning/30 bg-warning/5">
       <div className="flex items-center gap-2 bg-warning/10 px-4 py-2.5">
         <ShieldAlert size={15} className="shrink-0 text-warning" />
         <p className="text-sm font-bold text-ink">{title}</p>

@@ -35,6 +35,16 @@ export interface VoiceProvider {
    * Check if currently speaking
    */
   isSpeaking(): boolean
+
+  /**
+   * Enable or disable auto-speak (automatically speak AI responses)
+   */
+  setAutoSpeak(enabled: boolean): void
+
+  /**
+   * Check if auto-speak is enabled
+   */
+  isAutoSpeakEnabled(): boolean
 }
 
 /**

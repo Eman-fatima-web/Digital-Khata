@@ -8,10 +8,22 @@ import type { VoiceLanguage, VoiceProvider } from './VoiceProvider'
 export class BrowserTTSProvider implements VoiceProvider {
   readonly name = 'browser-tts'
   private isSpeakingFlag = false
+  private autoSpeakEnabled = false
+  private cachedVoice: SpeechSynthesisVoice | null = null
+  private cachedVoiceLanguage: string | null = null
+  private speechQueue: Array<{ text: string; language: VoiceLanguage }> = []
 
   isAvailable(): boolean {
     if (typeof window === 'undefined') return false
     return 'speechSynthesis' in window
+  }
+
+  setAutoSpeak(enabled: boolean): void {
+    this.autoSpeakEnabled = enabled
+  }
+
+  isAutoSpeakEnabled(): boolean {
+    return this.autoSpeakEnabled
   }
 
   stop(): void {
@@ -19,6 +31,7 @@ export class BrowserTTSProvider implements VoiceProvider {
       window.speechSynthesis.cancel()
       this.isSpeakingFlag = false
     }
+    this.speechQueue = []
   }
 
   isSpeaking(): boolean {
@@ -30,47 +43,73 @@ export class BrowserTTSProvider implements VoiceProvider {
       throw new Error('Speech Synthesis not available')
     }
 
-    // Stop any ongoing speech before starting new
-    this.stop()
+    // If already speaking, queue this utterance
+    if (this.isSpeakingFlag) {
+      this.speechQueue.push({ text, language })
+      return
+    }
 
+    await this.doSpeak(text, language)
+  }
+
+  private async doSpeak(text: string, language: VoiceLanguage): Promise<void> {
     const utterance = new SpeechSynthesisUtterance(text)
 
     // Set language
     if (language === 'ur') {
       utterance.lang = 'ur-PK'
     } else if (language === 'en-UR') {
-      // Mixed: try Urdu, fallback to English
       utterance.lang = 'ur-PK'
     } else {
       utterance.lang = 'en-US'
     }
 
-    // Select voice
-    const voice = this.selectVoice(language)
+    // Select voice (with caching)
+    const voice = this.selectVoiceCached(language)
     if (voice) {
       utterance.voice = voice
     }
 
     // Configure speech parameters for clarity
-    utterance.rate = 0.95 // Slightly slower than normal for clarity
-    utterance.pitch = 1.0 // Natural pitch
-    utterance.volume = 1.0 // Full volume
+    utterance.rate = 0.95
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
 
     this.isSpeakingFlag = true
 
     return new Promise((resolve, reject) => {
       utterance.onend = () => {
         this.isSpeakingFlag = false
+        // Process next queued utterance
+        const next = this.speechQueue.shift()
+        if (next) {
+          void this.doSpeak(next.text, next.language)
+        }
         resolve()
       }
 
       utterance.onerror = (event) => {
         this.isSpeakingFlag = false
+        this.speechQueue = []
         reject(new Error(`TTS error: ${event.error}`))
       }
 
       window.speechSynthesis.speak(utterance)
     })
+  }
+
+  /**
+   * Cached voice selection — avoids repeated voice list scans
+   */
+  private selectVoiceCached(language: VoiceLanguage): SpeechSynthesisVoice | null {
+    const langKey = language
+    if (this.cachedVoice && this.cachedVoiceLanguage === langKey) {
+      return this.cachedVoice
+    }
+    const voice = this.selectVoiceInternal(language)
+    this.cachedVoice = voice
+    this.cachedVoiceLanguage = langKey
+    return voice
   }
 
   /**
@@ -80,7 +119,7 @@ export class BrowserTTSProvider implements VoiceProvider {
    * 2. Female voice
    * 3. Default browser voice
    */
-  private selectVoice(language: VoiceLanguage): SpeechSynthesisVoice | null {
+  private selectVoiceInternal(language: VoiceLanguage): SpeechSynthesisVoice | null {
     const voices = window.speechSynthesis.getVoices()
 
     if (voices.length === 0) {
@@ -152,6 +191,14 @@ export class NoOpVoiceProvider implements VoiceProvider {
   }
 
   isSpeaking(): boolean {
+    return false
+  }
+
+  setAutoSpeak(): void {
+    // Silent no-op
+  }
+
+  isAutoSpeakEnabled(): boolean {
     return false
   }
 }

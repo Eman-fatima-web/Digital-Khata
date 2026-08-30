@@ -24,10 +24,27 @@ export type AIResult =
 
 export type AILanguage = 'en' | 'ur'
 
+export type ConversationTurn = {
+  role: 'user' | 'ai'
+  input: string
+  resolvedCustomer?: string
+  intent?: string
+  timestamp: string
+}
+
+export type ConversationContext = {
+  turns: ConversationTurn[]
+  lastCustomerId?: string
+  lastCustomerName?: string
+  lastAmount?: number
+  lastIntent?: string
+}
+
 export type AIRequest = {
   input: string
   data: KhataSnapshot
   language: AILanguage
+  context?: ConversationContext
 }
 
 export interface AIAdapter {

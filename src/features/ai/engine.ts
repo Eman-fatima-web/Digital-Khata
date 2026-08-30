@@ -2,6 +2,7 @@ import type { AILanguage, AIResult, ActionProposal, KhataSnapshot } from './type
 import { detectIntent } from './intents'
 import {
   detectMethod,
+  detectNewCustomer,
   detectPeriod,
   extractAmount,
   isInPeriod,
@@ -13,10 +14,20 @@ import { businessInsightAnswer } from './insights'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import type { Customer, UdhaarEntry } from '../../core/types'
 
-export function runEngine(input: string, data: KhataSnapshot, language: AILanguage): AIResult {
+export function runEngine(
+  input: string,
+  data: KhataSnapshot,
+  language: AILanguage,
+  resolvedCustomerName?: string,
+): AIResult {
   const r = getResponses(language)
   const intent = detectIntent(input)
-  const match = matchCustomers(input, data.customers)
+
+  // If the orchestrator resolved a pronoun to a customer name, use that for matching
+  const effectiveInput = resolvedCustomerName
+    ? input.replace(/\b(us ne|us ko|us ka|us ki|uske|uski|uska|usse|woh|wo|ye|yeh|him|her|them|he|she|it|they|that customer|the same|same customer|usko|usne|اس نے|اس کو|اس کا|اس کی|وہ|یہ|انہوں نے|ان کو)\b/gi, resolvedCustomerName)
+    : input
+  const match = matchCustomers(effectiveInput, data.customers)
 
   const customer = match.status === 'unique' ? match.customer : undefined
   const clarify = (candidates: Customer[]) =>
@@ -313,6 +324,48 @@ export function runEngine(input: string, data: KhataSnapshot, language: AILangua
 
     case 'TOTALS':
       return totalsAnswer()
+
+    case 'GREETING':
+      return { type: 'answer', text: r.greeting() }
+
+    case 'CREATE_CUSTOMER': {
+      const newCustomer = detectNewCustomer(input)
+      if (!newCustomer) {
+        return { type: 'clarification', text: language === 'ur'
+          ? 'براہ کرم نئے گاہک کا نام بتائیں۔ مثلاً: "نیا گاہک احمد شامل کرو"۔'
+          : 'Please tell me the new customer\'s name. For example: "Add new customer Ahmed".' }
+      }
+      const proposal: ActionProposal = {
+        kind: 'CREATE_CUSTOMER',
+        customerName: newCustomer.name,
+        customerPhone: newCustomer.phone,
+        note: {
+          en: newCustomer.phone ? `Phone: ${newCustomer.phone}` : 'No phone number provided.',
+          ur: newCustomer.phone ? `فون: ${newCustomer.phone}` : 'کوئی فون نمبر نہیں دیا گیا۔',
+        },
+      }
+      return { type: 'proposal', text: r.newCustomerProposal(newCustomer.name), proposal }
+    }
+
+    case 'RECORD_SALE': {
+      if (match.status === 'ambiguous') return clarify(match.candidates)
+      const amount = extractAmount(input)
+      if (!amount || amount <= 0) return { type: 'clarification', text: r.askAmount() }
+
+      const description = language === 'ur' ? 'فروخت (خاتہ AI)' : 'Sale (via Khata AI)'
+      const proposal: ActionProposal = {
+        kind: 'RECORD_SALE',
+        customerId: customer?.id,
+        customerName: customer?.name,
+        amount,
+        description,
+        date: localToday(),
+      }
+      return { type: 'proposal', text: r.saleProposal(customer?.name ?? '', amount), proposal }
+    }
+
+    case 'HELP':
+      return { type: 'answer', text: r.help() }
 
     case 'UNKNOWN':
       return { type: 'fallback' }

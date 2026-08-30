@@ -113,6 +113,8 @@ export type ActionKind =
   | 'DELETE_UDHAAR'
   | 'DELETE_PAYMENT'
   | 'SEND_REMINDER'
+  | 'CREATE_CUSTOMER'
+  | 'RECORD_SALE'
 
 // Metadata about an AI-proposed action. References entities by id; never a
 // copy of the financial records themselves.
