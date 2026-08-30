@@ -6,6 +6,7 @@ import type {
   Payment,
   Sale,
   SyncAction,
+  SyncConflictRecord,
   UdhaarEntry,
 } from '../../core/types'
 
@@ -15,6 +16,7 @@ export class KhataDB extends Dexie {
   payments!: Table<Payment, string>
   sales!: Table<Sale, string>
   syncQueue!: Table<SyncAction, string>
+  syncConflicts!: Table<SyncConflictRecord, string>
   aiMessages!: Table<AIMessage, string>
 
   constructor() {
@@ -42,6 +44,11 @@ export class KhataDB extends Dexie {
     // Compound index for where({userId, shopId}) history queries.
     this.version(3).stores({
       aiMessages: 'id, userId, shopId, [userId+shopId], createdAt',
+    })
+
+    // Conflict copies are local-only. The syncable entity schema remains unchanged.
+    this.version(4).stores({
+      syncConflicts: 'id, table, recordId, createdAt',
     })
   }
 }

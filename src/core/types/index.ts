@@ -59,6 +59,17 @@ export type SyncAction = {
   error?: string
 }
 
+// A local-only review record. It keeps both versions intact until the owner
+// explicitly chooses one; it is never sent to the cloud as business data.
+export type SyncConflictRecord = {
+  id: string
+  table: KhataTable
+  recordId: string
+  local: KhataEntity
+  remote: KhataEntity
+  createdAt: string
+}
+
 export type User = {
   id: string
   email?: string

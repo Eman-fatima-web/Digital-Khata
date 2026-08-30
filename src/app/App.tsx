@@ -15,6 +15,7 @@ const AI = lazy(() => import('../pages/AI/AI'))
 const Reports = lazy(() => import('../pages/Reports/Reports'))
 const Reminders = lazy(() => import('../pages/Reminders/Reminders'))
 const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
+const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
 const Settings = lazy(() => import('../pages/Settings/Settings'))
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/conflicts" element={<Conflicts />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

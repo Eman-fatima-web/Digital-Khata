@@ -36,6 +36,14 @@ export function useSyncQueue() {
   return useLiveQuery(() => db.syncQueue.orderBy('createdAt').toArray())
 }
 
+export function useSyncConflicts() {
+  return useLiveQuery(() => db.syncConflicts.orderBy('createdAt').reverse().toArray())
+}
+
+export function useSyncConflictCount() {
+  return useLiveQuery(() => db.syncConflicts.count(), [], 0)
+}
+
 export function useCustomerById(id: string) {
   return useLiveQuery(() => db.customers.get(id), [id], undefined)
 }

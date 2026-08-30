@@ -3,6 +3,8 @@ import { Moon, Sun, RefreshCw, Wifi, WifiOff, AlertCircle, Lock } from 'lucide-r
 import { useApp } from '../../hooks/useApp'
 import { useNetwork } from '../../hooks/useNetwork'
 import { useSync } from '../../hooks/useSync'
+import { useSyncConflictCount } from '../../hooks/useKhataData'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../../core/i18n'
 import { cn } from '../../lib/utils'
 import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
@@ -12,12 +14,22 @@ export function Header() {
   const isOnline = useNetwork()
   const { state: syncState, sync } = useSync()
   const { t } = useTranslation()
+  const conflictCount = useSyncConflictCount()
+  const navigate = useNavigate()
 
   const isSyncing = syncState === 'syncing'
   const isError = syncState === 'error'
+  const hasConflicts = conflictCount > 0
 
   const statusConfig = isOnline
-    ? isError
+    ? hasConflicts
+      ? {
+          icon: AlertCircle,
+          label: t('common.conflicts', { count: conflictCount }),
+          color: 'text-warning',
+          dotColor: 'bg-warning',
+        }
+      : isError
       ? {
           icon: AlertCircle,
           label: t('common.syncError'),
@@ -56,12 +68,12 @@ export function Header() {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => void sync()}
-            disabled={!isOnline || isSyncing}
+            onClick={() => hasConflicts ? navigate('/conflicts') : void sync()}
+            disabled={(!isOnline || isSyncing) && !hasConflicts}
             className={cn(
               'flex items-center gap-1.5 rounded-full border border-surface-hairline px-2.5 py-1.5 text-[11px] font-semibold transition',
               statusConfig.color,
-              (!isOnline || isSyncing) && 'opacity-60',
+              ((!isOnline || isSyncing) && !hasConflicts) && 'opacity-60',
             )}
           >
             <span className={cn('h-2 w-2 rounded-full', statusConfig.dotColor)} />
