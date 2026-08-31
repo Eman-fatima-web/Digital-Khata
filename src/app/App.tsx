@@ -8,6 +8,7 @@ import { useApp } from '../hooks/useApp'
 
 const Login = lazy(() => import('../pages/Auth/Login'))
 const Register = lazy(() => import('../pages/Auth/Register'))
+const VerifyEmail = lazy(() => import('../pages/Auth/VerifyEmail'))
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('../pages/Customers/Customers'))
 const CustomerDetail = lazy(() => import('../pages/Customers/CustomerDetail'))
@@ -19,6 +20,7 @@ const Reports = lazy(() => import('../pages/Reports/Reports'))
 const Reminders = lazy(() => import('../pages/Reminders/Reminders'))
 const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
 const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
+const Trash = lazy(() => import('../pages/Trash/Trash'))
 const Settings = lazy(() => import('../pages/Settings/Settings'))
 
 function App() {
@@ -29,6 +31,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           element={
@@ -48,6 +51,7 @@ function App() {
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/conflicts" element={<Conflicts />} />
+          <Route path="/trash" element={<Trash />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Routes>

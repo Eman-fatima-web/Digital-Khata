@@ -1,8 +1,8 @@
 import type { Customer, KhataEntity, Payment, Sale, UdhaarEntry } from '../../core/types'
-import { addCustomer, deleteCustomer, getCustomerById, searchCustomers, updateCustomer } from '../../data/repositories/customerRepo'
-import { addUdhaar, deleteUdhaar, getUdhaarByCustomer, updateUdhaar } from '../../data/repositories/udhaarRepo'
-import { addPayment, deletePayment, getPaymentsByCustomer, updatePayment } from '../../data/repositories/paymentRepo'
-import { addSale, deleteSale } from '../../data/repositories/saleRepo'
+import { addCustomer, deleteCustomer, getCustomerById, restoreCustomer, searchCustomers, updateCustomer } from '../../data/repositories/customerRepo'
+import { addUdhaar, deleteUdhaar, getUdhaarByCustomer, restoreUdhaar, updateUdhaar } from '../../data/repositories/udhaarRepo'
+import { addPayment, deletePayment, getPaymentsByCustomer, restorePayment, updatePayment } from '../../data/repositories/paymentRepo'
+import { addSale, deleteSale, restoreSale } from '../../data/repositories/saleRepo'
 import { matchCustomers } from './nlp'
 
 type Owner = { userId: string; shopId: string }
@@ -42,6 +42,12 @@ export const TOOL_REGISTRY: Record<string, ToolMetadata> = {
   deleteUdhaar: { name: 'deleteUdhaar', permission: 'high_risk', requiresConfirmation: true, description: 'Delete an udhaar entry (soft delete)' },
   deletePayment: { name: 'deletePayment', permission: 'high_risk', requiresConfirmation: true, description: 'Delete a payment (soft delete)' },
   deleteSale: { name: 'deleteSale', permission: 'high_risk', requiresConfirmation: true, description: 'Delete a sale (soft delete)' },
+
+  // RESTORE tools — confirmation required
+  restoreCustomer: { name: 'restoreCustomer', permission: 'write', requiresConfirmation: true, description: 'Restore a deleted customer' },
+  restoreUdhaar: { name: 'restoreUdhaar', permission: 'write', requiresConfirmation: true, description: 'Restore a deleted udhaar entry' },
+  restorePayment: { name: 'restorePayment', permission: 'write', requiresConfirmation: true, description: 'Restore a deleted payment' },
+  restoreSale: { name: 'restoreSale', permission: 'write', requiresConfirmation: true, description: 'Restore a deleted sale' },
 
   // UPDATE tools — confirmation required
   updateCustomer: { name: 'updateCustomer', permission: 'write', requiresConfirmation: true, description: 'Update customer details' },
@@ -88,6 +94,15 @@ export function validateToolArgs(toolName: string, args: Record<string, unknown>
     case 'deleteSale':
       if (!args.id || typeof args.id !== 'string') {
         return 'Record ID is required for deletion'
+      }
+      return null
+
+    case 'restoreCustomer':
+    case 'restoreUdhaar':
+    case 'restorePayment':
+    case 'restoreSale':
+      if (!args.id || typeof args.id !== 'string') {
+        return 'Record ID is required for restore'
       }
       return null
 
@@ -219,6 +234,42 @@ export async function aiDeleteSale(saleId: string): Promise<ToolResult<void>> {
     return { ok: true, data: undefined }
   } catch (error) {
     return { ok: false, error: 'repo-error', message: `Failed to delete sale: ${error}` }
+  }
+}
+
+export async function aiRestoreCustomer(customerId: string): Promise<ToolResult<void>> {
+  try {
+    await restoreCustomer(customerId)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to restore customer: ${error}` }
+  }
+}
+
+export async function aiRestoreUdhaar(udhaarId: string): Promise<ToolResult<void>> {
+  try {
+    await restoreUdhaar(udhaarId)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to restore udhaar: ${error}` }
+  }
+}
+
+export async function aiRestorePayment(paymentId: string): Promise<ToolResult<void>> {
+  try {
+    await restorePayment(paymentId)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to restore payment: ${error}` }
+  }
+}
+
+export async function aiRestoreSale(saleId: string): Promise<ToolResult<void>> {
+  try {
+    await restoreSale(saleId)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to restore sale: ${error}` }
   }
 }
 

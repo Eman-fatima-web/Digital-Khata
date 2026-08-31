@@ -2,7 +2,8 @@ import { detectGreeting, detectNegation, normalize } from './nlp'
 
 export type Intent =
   | 'RECORD_PAYMENT' | 'ADD_UDHAAR' | 'DELETE_UDHAAR' | 'DELETE_PAYMENT'
-  | 'DELETE_SALE' | 'UPDATE_CUSTOMER' | 'UPDATE_UDHAAR' | 'UPDATE_PAYMENT'
+  | 'DELETE_SALE' | 'RESTORE_CUSTOMER' | 'RESTORE_UDHAAR' | 'RESTORE_PAYMENT'
+  | 'RESTORE_SALE' | 'UPDATE_CUSTOMER' | 'UPDATE_UDHAAR' | 'UPDATE_PAYMENT'
   | 'SEND_REMINDER' | 'OVERDUE_CUSTOMERS' | 'TOP_DEBTORS' | 'BUSINESS_INSIGHT'
   | 'SALES_SUMMARY' | 'CUSTOMER_PAYMENTS_TOTAL' | 'CUSTOMER_HISTORY'
   | 'CUSTOMER_BALANCE' | 'TOTALS' | 'CREATE_CUSTOMER' | 'RECORD_SALE'
@@ -18,6 +19,7 @@ const includesAny = (input: string, terms: string[]) => terms.some((term) => inp
 const PAYMENT = ['payment', 'payments', 'adai', 'adaigi', 'jama', 'ادائیگی', 'ادائیگیاں', 'ادا', 'وصولی']
 const UDHAAR = ['udhaar', 'udhar', 'odhaar', 'credit', 'qarz', 'dua', 'ادھار', 'ادھار', 'قرض']
 const DELETE = ['delete', 'remove', 'hatao', 'hatana', 'hata', 'khatam', 'cancel', 'حذف', 'ہٹاؤ', 'ہٹاو', 'منسوخ']
+const RESTORE = ['restore', 'recover', 'undelete', 'wapas lao', 'wapas', 'wapis', 'بحال', 'واپس', 'واپس لاؤ', 'واپس لاو']
 const RECEIVE = ['receive', 'received', 'record', 'jama', 'collect', 'deposit', 'lena', 'leni', 'lelo', 'le lo', 'le li', 'kar lo', 'karlo', 'kr lo', 'krlo', 'وصول', 'جمع', 'لے لو', 'کرلو', 'کردو']
 const GIVE = ['de', 'dena', 'diya', 'diye', 'dedi', 'dijiye', 'add', 'added', 'record', 'likh', 'likho', 'de do', 'دے', 'دینا', 'دیا', 'لکھو', 'شامل', 'کردو']
 const REMINDER = ['reminder', 'remind', 'whatsapp', 'yaad dila', 'yad dila', 'message bhej', 'msg bhej', 'یاد دہانی', 'یاد دلاؤ', 'یاد دلاو', 'پیغام بھیج']
@@ -75,6 +77,13 @@ export function detectIntent(input: string): Intent {
     if (hasPayment) return 'DELETE_PAYMENT'
     if (hasUdhaar) return 'DELETE_UDHAAR'
     if (includesAny(norm, SALES)) return 'DELETE_SALE'
+  }
+
+  if (!isQuestion && includesAny(norm, RESTORE)) {
+    if (hasPayment) return 'RESTORE_PAYMENT'
+    if (hasUdhaar) return 'RESTORE_UDHAAR'
+    if (includesAny(norm, SALES)) return 'RESTORE_SALE'
+    if (includesAny(norm, ['customer', 'gahak', 'گاہک'])) return 'RESTORE_CUSTOMER'
   }
 
   // Update intents — checked early to avoid conflicts with other actions

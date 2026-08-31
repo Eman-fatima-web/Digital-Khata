@@ -72,6 +72,29 @@ export async function deleteSale(id: string): Promise<void> {
   })
 }
 
+export async function restoreSale(id: string): Promise<void> {
+  const existing = await db.sales.get(id)
+  if (!existing) throw new Error(`Sale ${id} not found`)
+
+  const now = nowISO()
+  const restored: Sale = {
+    ...existing,
+    updatedAt: now,
+    syncStatus: 'pending',
+    version: existing.version + 1,
+    isDeleted: false,
+  }
+
+  await db.transaction('rw', db.sales, db.syncQueue, async () => {
+    await db.sales.put(restored)
+    await enqueueSyncAction('sales', id, 'update', restored)
+  })
+}
+
+export async function getDeletedSales(): Promise<Sale[]> {
+  return db.sales.filter((s) => s.isDeleted === true).reverse().sortBy('updatedAt')
+}
+
 export async function getSaleById(id: string): Promise<Sale | undefined> {
   return db.sales.get(id)
 }

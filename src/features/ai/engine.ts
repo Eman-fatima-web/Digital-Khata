@@ -839,6 +839,72 @@ export function runEngine(
       return { type: 'proposal', text: r.deleteSaleProposal(customer.name, latest.amount), proposal }
     }
 
+    case 'RESTORE_CUSTOMER': {
+      if (match.status === 'ambiguous') return clarify(match.candidates)
+      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+
+      const proposal: ActionProposal = {
+        kind: 'RESTORE_CUSTOMER',
+        customerId: customer.id,
+        customerName: customer.name,
+      }
+      return { type: 'proposal', text: r.restoreCustomerProposal(customer.name), proposal }
+    }
+
+    case 'RESTORE_UDHAAR': {
+      if (match.status === 'ambiguous') return clarify(match.candidates)
+      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+
+      const entries = udhaarFor(customer.id)
+      if (entries.length === 0) return { type: 'answer', text: r.noDeletedUdhaar(customer.name) }
+
+      const entry = entries[0]
+      const proposal: ActionProposal = {
+        kind: 'RESTORE_UDHAAR',
+        customerId: customer.id,
+        customerName: customer.name,
+        udhaarId: entry.id,
+        udhaarDescription: entry.description,
+      }
+      return { type: 'proposal', text: r.restoreUdhaarProposal(entry.description), proposal }
+    }
+
+    case 'RESTORE_PAYMENT': {
+      if (match.status === 'ambiguous') return clarify(match.candidates)
+      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+
+      const latest = paymentsFor(customer.id)[0]
+      if (!latest) return { type: 'answer', text: r.noDeletedPayment(customer.name) }
+
+      const proposal: ActionProposal = {
+        kind: 'RESTORE_PAYMENT',
+        customerId: customer.id,
+        customerName: customer.name,
+        amount: latest.amount,
+        paymentId: latest.id,
+        paymentDate: latest.date,
+      }
+      return { type: 'proposal', text: r.restorePaymentProposal(latest.amount), proposal }
+    }
+
+    case 'RESTORE_SALE': {
+      if (match.status === 'ambiguous') return clarify(match.candidates)
+      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+
+      const latest = salesFor(customer.id)[0]
+      if (!latest) return { type: 'answer', text: r.noDeletedSale(customer.name) }
+
+      const proposal: ActionProposal = {
+        kind: 'RESTORE_SALE',
+        customerId: customer.id,
+        customerName: customer.name,
+        amount: latest.amount,
+        saleId: latest.id,
+        saleDate: latest.date,
+      }
+      return { type: 'proposal', text: r.restoreSaleProposal(latest.amount), proposal }
+    }
+
     case 'UPDATE_CUSTOMER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
       if (!customer) return { type: 'clarification', text: r.askCustomer() }

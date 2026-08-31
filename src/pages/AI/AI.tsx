@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Brain, Mic, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { Brain, ChevronDown, Menu, Mic, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useCustomers, usePayments, useSales, useUdhaar } from '../../hooks/useKhataData'
@@ -23,6 +23,10 @@ import {
   aiDeleteUdhaar,
   aiDeletePayment,
   aiDeleteSale,
+  aiRestoreCustomer,
+  aiRestoreUdhaar,
+  aiRestorePayment,
+  aiRestoreSale,
   aiUpdateCustomer,
   aiUpdateUdhaar,
   aiUpdatePayment,
@@ -34,6 +38,15 @@ import {
   getAIMessageHistory,
   updateAIMessageState,
 } from '../../data/repositories/aiMessageRepo'
+import {
+  createConversation,
+  getConversations,
+  updateConversationTitle,
+  touchConversation,
+  deleteConversation,
+} from '../../data/repositories/conversationRepo'
+import type { Conversation } from '../../core/types'
+import { ConversationSidebar } from './components/ConversationSidebar'
 import { cn, formatCurrency, formatDate, generateId, localDateKey, nowISO } from '../../lib/utils'
 import { ConfirmCard } from '../../components/ui/ConfirmCard'
 import { CustomerCard, TransactionCard, NavigationCard, ReportCard } from '../../components/ai/ActionCards'
@@ -201,16 +214,51 @@ function AI() {
   const [listening, setListening] = useState(false)
   const [autoSpeak, setAutoSpeakState] = useState(false)
   const [lastIntent, setLastIntent] = useState<string | undefined>(undefined)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
+
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConvId, setActiveConvId] = useState<string | null>(() =>
+    sessionStorage.getItem('dk-active-conversation'),
+  )
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const titleGeneratedRef = useRef(false)
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contextRef = useRef<ConversationContext>(createEmptyContext())
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const handleTextareaKeydown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const text = input.trim()
+      if (text && !thinking) {
+        setInput('')
+        void sendText(text)
+      }
+    }
+  }
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+    setShowScrollBtn(!nearBottom)
+  }, [])
+
+  const scrollToBottom = useCallback((smooth = true) => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'instant' })
+  }, [])
 
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [messages, thinking])
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+    if (nearBottom) scrollToBottom(false)
+  }, [messages, thinking, scrollToBottom])
 
   useEffect(() => {
     return () => {
@@ -224,10 +272,30 @@ function AI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const refreshConversations = useCallback(async () => {
+    const list = await getConversations(owner.userId, owner.shopId)
+    setConversations(list)
+    return list
+  }, [owner.userId, owner.shopId])
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const history = await getAIMessageHistory(owner)
+      let list = await getConversations(owner.userId, owner.shopId)
+      if (list.length === 0) {
+        const conv = await createConversation(owner.userId, owner.shopId)
+        list = [conv]
+      }
+      if (cancelled) return
+      setConversations(list)
+
+      const saved = sessionStorage.getItem('dk-active-conversation')
+      const valid = saved && list.some((c) => c.id === saved)
+      const targetId = valid ? saved! : list[0].id
+      setActiveConvId(targetId)
+      sessionStorage.setItem('dk-active-conversation', targetId)
+
+      const history = await getAIMessageHistory(owner, targetId)
       if (cancelled) return
       setMessages(
         history.map((row) => ({
@@ -239,6 +307,7 @@ function AI() {
           proposalState: row.actionState ?? (row.action ? 'pending' : undefined),
         })),
       )
+      titleGeneratedRef.current = history.some((r) => r.role === 'user')
     })()
     return () => {
       cancelled = true
@@ -280,7 +349,18 @@ function AI() {
       createdAt,
       action: proposal,
       actionState: proposal ? 'pending' : undefined,
+      conversationId: activeConvId ?? undefined,
     })
+    if (activeConvId) {
+      void touchConversation(activeConvId)
+      if (role === 'user' && !titleGeneratedRef.current) {
+        titleGeneratedRef.current = true
+        const title = text.length > 40 ? text.slice(0, 40).replace(/\s+\S*$/, '') + '...' : text
+        void updateConversationTitle(activeConvId, title).then(() => {
+          void refreshConversations()
+        })
+      }
+    }
     return id
   }
 
@@ -338,6 +418,9 @@ function AI() {
     event.preventDefault()
     const text = input
     setInput('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
     void sendText(text)
   }
 
@@ -492,6 +575,30 @@ function AI() {
         return r.successDeleteSale(proposal.amount ?? 0, proposal.saleDate ?? '')
       }
 
+      case 'RESTORE_CUSTOMER': {
+        const result = await aiRestoreCustomer(proposal.customerId as string)
+        if (!result.ok) return r.actionFailed()
+        return r.successRestoreCustomer(proposal.customerName as string)
+      }
+
+      case 'RESTORE_UDHAAR': {
+        const result = await aiRestoreUdhaar(proposal.udhaarId as string)
+        if (!result.ok) return r.actionFailed()
+        return r.successRestoreUdhaar(proposal.udhaarDescription ?? '')
+      }
+
+      case 'RESTORE_PAYMENT': {
+        const result = await aiRestorePayment(proposal.paymentId as string)
+        if (!result.ok) return r.actionFailed()
+        return r.successRestorePayment(proposal.amount ?? 0, proposal.paymentDate ?? '')
+      }
+
+      case 'RESTORE_SALE': {
+        const result = await aiRestoreSale(proposal.saleId as string)
+        if (!result.ok) return r.actionFailed()
+        return r.successRestoreSale(proposal.amount ?? 0, proposal.saleDate ?? '')
+      }
+
       case 'UPDATE_CUSTOMER': {
         const result = await aiUpdateCustomer(
           proposal.customerId as string,
@@ -567,12 +674,7 @@ function AI() {
       void updateAIMessageState(messageId, 'confirmed')
       logActionConfirmed(message.proposal)
       pushMessage('ai', text)
-      // Focus management: scroll to the new response
-      setTimeout(() => {
-        if (scrollRef.current) {
-          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-        }
-      }, 100)
+      setTimeout(() => scrollToBottom(true), 100)
     } catch (error) {
       console.error('Khata AI action failed:', error)
       setMessages((prev) =>
@@ -635,6 +737,10 @@ function AI() {
     DELETE_UDHAAR: t('ai.actionDeleteUdhaar'),
     DELETE_PAYMENT: t('ai.actionDeletePayment'),
     DELETE_SALE: t('ai.actionDeleteSale'),
+    RESTORE_CUSTOMER: t('ai.actionRestoreCustomer'),
+    RESTORE_UDHAAR: t('ai.actionRestoreUdhaar'),
+    RESTORE_PAYMENT: t('ai.actionRestorePayment'),
+    RESTORE_SALE: t('ai.actionRestoreSale'),
     UPDATE_CUSTOMER: t('ai.actionUpdateCustomer'),
     UPDATE_UDHAAR: t('ai.actionUpdateUdhaar'),
     UPDATE_PAYMENT: t('ai.actionUpdatePayment'),
@@ -723,9 +829,57 @@ function AI() {
 
   /** Determine if a proposal kind requires explicit user confirmation */
   const requiresActionConfirmation = (kind: ActionKind): boolean => {
-    // READ actions don't need confirmation
-    // WRITE and HIGH_RISK actions need confirmation
-    return kind !== 'NAVIGATE' // Navigation is non-destructive, no confirmation needed
+    return kind !== 'NAVIGATE'
+  }
+
+  const handleNewChat = async () => {
+    const conv = await createConversation(owner.userId, owner.shopId)
+    setConversations((prev) => [conv, ...prev])
+    setActiveConvId(conv.id)
+    sessionStorage.setItem('dk-active-conversation', conv.id)
+    setMessages([])
+    contextRef.current = createEmptyContext()
+    setLastIntent(undefined)
+    titleGeneratedRef.current = false
+    setSidebarOpen(false)
+  }
+
+  const handleSelectConversation = async (id: string) => {
+    if (id === activeConvId) return
+    setActiveConvId(id)
+    sessionStorage.setItem('dk-active-conversation', id)
+    const history = await getAIMessageHistory(owner, id)
+    setMessages(
+      history.map((row) => ({
+        id: row.id,
+        role: row.role,
+        text: row.content,
+        createdAt: row.createdAt,
+        proposal: row.action,
+        proposalState: row.actionState ?? (row.action ? 'pending' : undefined),
+      })),
+    )
+    contextRef.current = createEmptyContext()
+    setLastIntent(undefined)
+    titleGeneratedRef.current = history.some((r) => r.role === 'user')
+  }
+
+  const handleDeleteConversation = async (id: string) => {
+    if (!window.confirm(t('ai.deleteChatConfirm'))) return
+    await deleteConversation(id)
+    const list = await refreshConversations()
+    if (id === activeConvId) {
+      if (list.length > 0) {
+        await handleSelectConversation(list[0].id)
+      } else {
+        const conv = await createConversation(owner.userId, owner.shopId)
+        const newList = await refreshConversations()
+        setActiveConvId(conv.id)
+        sessionStorage.setItem('dk-active-conversation', conv.id)
+        setMessages([])
+        setConversations(newList)
+      }
+    }
   }
 
   /** Render structured action card based on proposal type */
@@ -769,9 +923,29 @@ function AI() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-200px)] w-full max-w-3xl flex-col lg:min-h-[calc(100dvh-125px)]">
+    <div className="flex h-[calc(100dvh-125px)] w-full min-h-[calc(100dvh-200px)] lg:h-[calc(100dvh-125px)]">
+      <ConversationSidebar
+        conversations={conversations}
+        activeId={activeConvId}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNew={() => void handleNewChat()}
+        onSelect={(id) => void handleSelectConversation(id)}
+        onDelete={(id) => void handleDeleteConversation(id)}
+        t={t}
+      />
+      <div className="mx-auto flex min-w-0 flex-1 flex-col px-4">
       <section className="flex items-center justify-between gap-3 rounded-2xl border border-surface-hairline bg-surface-card px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((prev) => !prev)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition hover:bg-surface-hover hover:text-ink md:hidden"
+            aria-label={t('ai.toggleSidebar')}
+            title={t('ai.toggleSidebar')}
+          >
+            <Menu size={20} />
+          </button>
           <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
             <Brain size={22} />
             <span className="absolute -end-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-surface-card bg-success-400" />
@@ -811,7 +985,8 @@ function AI() {
         </div>
       </section>
 
-      <div ref={scrollRef} role="log" aria-live="polite" className="scrollbar-hidden mt-4 flex-1 space-y-4 overflow-y-auto pe-1">
+      <div className="relative mt-4 flex flex-1 flex-col overflow-hidden">
+        <div ref={scrollRef} role="log" aria-live="polite" onScroll={handleScroll} className="scrollbar-hidden flex-1 space-y-4 overflow-y-auto pe-1">
         <AiBubble text={t('ai.welcome')} />
 
         {messages.length <= 1 && (
@@ -902,6 +1077,18 @@ function AI() {
             </div>
           </div>
         )}
+        </div>
+
+        {showScrollBtn && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-3 end-3 flex h-9 w-9 items-center justify-center rounded-full border border-surface-hairline bg-surface-card shadow-md transition hover:bg-surface-hover"
+            aria-label="Scroll to bottom"
+          >
+            <ChevronDown size={18} className="text-ink-muted" />
+          </button>
+        )}
       </div>
 
       <div className="scrollbar-hidden mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -920,13 +1107,23 @@ function AI() {
 
       <form
         onSubmit={handleSubmit}
-        className="safe-bottom sticky bottom-0 mt-3 flex items-center gap-1.5 rounded-2xl border border-surface-hairline bg-surface-card p-1.5 shadow-sm"
+        className="safe-bottom sticky bottom-0 mt-3 flex items-end gap-1.5 rounded-2xl border border-surface-hairline bg-surface-card p-1.5 shadow-sm"
       >
-        <input
+        <textarea
+          ref={textareaRef}
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value)
+            const el = e.target
+            el.style.height = 'auto'
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+          }}
+          onKeyDown={handleTextareaKeydown}
           placeholder={listening ? t('ai.listening') : t('ai.placeholder')}
-          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-subtle"
+          disabled={thinking}
+          rows={1}
+          inputMode="text"
+          className="max-h-[120px] min-w-0 flex-1 resize-none bg-transparent px-3 py-2.5 text-sm leading-6 text-ink outline-none placeholder:text-ink-subtle disabled:opacity-50"
         />
         <button
           type="button"
@@ -958,6 +1155,7 @@ function AI() {
           <Send size={17} className="rtl:-scale-x-100" />
         </button>
       </form>
+      </div>
     </div>
   )
 }

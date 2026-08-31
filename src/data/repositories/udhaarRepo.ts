@@ -74,6 +74,29 @@ export async function deleteUdhaar(id: string): Promise<void> {
   })
 }
 
+export async function restoreUdhaar(id: string): Promise<void> {
+  const existing = await db.udhaar.get(id)
+  if (!existing) throw new Error(`Udhaar ${id} not found`)
+
+  const now = nowISO()
+  const restored: UdhaarEntry = {
+    ...existing,
+    updatedAt: now,
+    syncStatus: 'pending',
+    version: existing.version + 1,
+    isDeleted: false,
+  }
+
+  await db.transaction('rw', db.udhaar, db.syncQueue, async () => {
+    await db.udhaar.put(restored)
+    await enqueueSyncAction('udhaar', id, 'update', restored)
+  })
+}
+
+export async function getDeletedUdhaar(): Promise<UdhaarEntry[]> {
+  return db.udhaar.filter((e) => e.isDeleted === true).reverse().sortBy('updatedAt')
+}
+
 export async function getUdhaarById(id: string): Promise<UdhaarEntry | undefined> {
   return db.udhaar.get(id)
 }

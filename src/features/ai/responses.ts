@@ -77,6 +77,18 @@ type Responses = {
   updateCustomerProposal: (name: string) => string
   updateUdhaarProposal: (description: string, amount: number) => string
   updatePaymentProposal: (amount: number, date: string) => string
+  successRestoreCustomer: (name: string) => string
+  successRestoreUdhaar: (description: string) => string
+  successRestorePayment: (amount: number, date: string) => string
+  successRestoreSale: (amount: number, date: string) => string
+  noDeletedCustomer: (name: string) => string
+  noDeletedUdhaar: (name: string) => string
+  noDeletedPayment: (name: string) => string
+  noDeletedSale: (name: string) => string
+  restoreCustomerProposal: (name: string) => string
+  restoreUdhaarProposal: (description: string) => string
+  restorePaymentProposal: (amount: number) => string
+  restoreSaleProposal: (amount: number) => string
 }
 
 const en: Responses = {
@@ -185,6 +197,20 @@ const en: Responses = {
   updateCustomerProposal: (name) => `"${name}" ki details update kar doon?`,
   updateUdhaarProposal: (description, amount) => `"${description}" (${formatCurrency(amount)}) udhaar update kar doon?`,
   updatePaymentProposal: (amount, date) => `${formatDate(date)} ki ${formatCurrency(amount)} payment update kar doon?`,
+  successRestoreCustomer: (name) => `Ho gaya! Customer "${name}" restore ho gaya hai.`,
+  successRestoreUdhaar: (description) => `Ho gaya! Udhaar "${description}" restore ho gaya.`,
+  successRestorePayment: (amount, date) =>
+    `Ho gaya! ${formatCurrency(amount)} ki payment restore ho gayi (${formatDate(date)}).`,
+  successRestoreSale: (amount, date) =>
+    `Ho gaya! ${formatCurrency(amount)} ki sale restore ho gayi (${formatDate(date)}).`,
+  noDeletedCustomer: (name) => `"${name}" koi deleted customer nahi mila.`,
+  noDeletedUdhaar: (name) => `${name} ka koi deleted udhaar nahi hai.`,
+  noDeletedPayment: (name) => `${name} ki koi deleted payment nahi hai.`,
+  noDeletedSale: (name) => `${name} ki koi deleted sale nahi hai.`,
+  restoreCustomerProposal: (name) => `"${name}" ko restore kar doon?`,
+  restoreUdhaarProposal: (description) => `"${description}" udhaar restore kar doon?`,
+  restorePaymentProposal: (amount) => `${formatCurrency(amount)} ki payment restore kar doon?`,
+  restoreSaleProposal: (amount) => `${formatCurrency(amount)} ki sale restore kar doon?`,
 }
 
 const ur: Responses = {
@@ -293,6 +319,20 @@ const ur: Responses = {
   updateCustomerProposal: (name) => `"${name}" کی تفصیلات اپ ڈیٹ کر دوں؟`,
   updateUdhaarProposal: (description, amount) => `"${description}" (${formatCurrency(amount)}) ادھار اپ ڈیٹ کر دوں؟`,
   updatePaymentProposal: (amount, date) => `${formatDate(date)} کی ${formatCurrency(amount)} ادائیگی اپ ڈیٹ کر دوں؟`,
+  successRestoreCustomer: (name) => `مکمل! گاہک "${name}" بحال ہو گیا ہے۔`,
+  successRestoreUdhaar: (description) => `مکمل! ادھار "${description}" بحال ہو گیا۔`,
+  successRestorePayment: (amount, date) =>
+    `مکمل! ${formatCurrency(amount)} کی ادائیگی بحال ہو گئی (${formatDate(date)})۔`,
+  successRestoreSale: (amount, date) =>
+    `مکمل! ${formatCurrency(amount)} کی فروخت بحال ہو گئی (${formatDate(date)})۔`,
+  noDeletedCustomer: (name) => `"${name}" کوئی حذف شدہ گاہک نہیں ملا۔`,
+  noDeletedUdhaar: (name) => `${name} کا کوئی حذف شدہ ادھار نہیں ہے۔`,
+  noDeletedPayment: (name) => `${name} کی کوئی حذف شدہ ادائیگی نہیں ہے۔`,
+  noDeletedSale: (name) => `${name} کی کوئی حذف شدہ فروخت نہیں ہے۔`,
+  restoreCustomerProposal: (name) => `"${name}" کو بحال کر دوں؟`,
+  restoreUdhaarProposal: (description) => `"${description}" ادھار بحال کر دوں؟`,
+  restorePaymentProposal: (amount) => `${formatCurrency(amount)} کی ادائیگی بحال کر دوں؟`,
+  restoreSaleProposal: (amount) => `${formatCurrency(amount)} کی فروخت بحال کر دوں؟`,
 }
 
 const periodLabels: Record<AILanguage, Record<string, string>> = {
