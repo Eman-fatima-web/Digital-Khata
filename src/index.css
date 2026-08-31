@@ -42,6 +42,7 @@
   /* Surfaces */
   --color-surface: #F8FAF7;
   --color-surface-card: #FFFFFF;
+  --color-surface-hover: #EDF2ED;
   --color-surface-hairline: #E3EEE7;
 
   /* Semantic */
@@ -52,24 +53,41 @@
 
 [data-theme="dark"] {
   /* Premium dark theme - deep neutral backgrounds, not pure black */
-  --color-ink: #F1F5F9;           /* Light gray for primary text - excellent readability */
-  --color-ink-light: #CBD5E1;     /* Medium gray for secondary text */
-  --color-ink-muted: #94A3B8;     /* Muted gray for tertiary text */
-  --color-ink-subtle: #64748B;    /* Subtle gray for hints */
-  
-  /* Deep neutral surfaces - comfortable for long usage */
-  --color-surface: #0F172A;       /* Deep slate blue-gray, not pure black */
-  --color-surface-card: #1E293B;  /* Elevated card surface */
-  --color-surface-hairline: #334155; /* Subtle borders */
-  
-  /* Vibrant but not harsh accent colors */
-  --color-primary-500: #14B8A6;   /* Teal - vibrant but comfortable */
-  --color-primary-600: #2DD4BF;   /* Lighter teal for hover states */
-  --color-success-500: #10B981;   /* Emerald green */
-  --color-accent-500: #F59E0B;    /* Amber gold */
-  --color-danger: #EF4444;        /* Red */
-  --color-warning: #F59E0B;       /* Amber */
-  --color-info: #3B82F6;          /* Blue */
+  --color-ink: #F1F5F9 !important;
+  --color-ink-light: #CBD5E1 !important;
+  --color-ink-muted: #94A3B8 !important;
+  --color-ink-subtle: #64748B !important;
+
+  --color-surface: #0F172A !important;
+  --color-surface-card: #1E293B !important;
+  --color-surface-hover: #283548 !important;
+  --color-surface-hairline: #334155 !important;
+
+  --color-primary-500: #14B8A6 !important;
+  --color-primary-600: #2DD4BF !important;
+  --color-success-500: #10B981 !important;
+  --color-accent-500: #F59E0B !important;
+  --color-danger: #EF4444 !important;
+  --color-warning: #F59E0B !important;
+  --color-info: #3B82F6 !important;
+
+  /* Dark tints for success backgrounds — prevents white-on-white in dark mode */
+  --color-success-50: #0A2618 !important;
+  --color-success-100: #0D3320 !important;
+  --color-success-200: #166534 !important;
+  --color-success-600: #34D399 !important;
+  --color-success-700: #6EE7B7 !important;
+
+  /* Dark tints for primary backgrounds — prevents white-on-white in dark mode */
+  --color-primary-50: #0A1F1D !important;
+  --color-primary-100: #0D2E2A !important;
+  --color-primary-200: #115E59 !important;
+  --color-primary-700: #5EEAD4 !important;
+
+  /* Dark tints for accent backgrounds — prevents bright yellow patch in dark mode */
+  --color-accent-100: #2A2008 !important;
+  --color-accent-200: #3D2E0A !important;
+  --color-accent-600: #FBBF24 !important;
 }
 
 @layer base {

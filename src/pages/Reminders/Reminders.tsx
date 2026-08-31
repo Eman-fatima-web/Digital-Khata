@@ -231,7 +231,11 @@ function Reminders() {
                   <Icon size={20} />
                 </div>
                 {tab.count !== undefined && (
-                  <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-bold text-ink-muted">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                    activeTab === tab.key
+                      ? 'bg-success-100 text-success-700'
+                      : 'bg-surface text-ink-muted'
+                  }`}>
                     {tab.count}
                   </span>
                 )}
