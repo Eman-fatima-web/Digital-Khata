@@ -9,6 +9,8 @@ import {
   AlertCircle,
   Users,
   ChevronRight,
+  DownloadCloud,
+  FileText,
 } from 'lucide-react'
 
 import { useCustomers, useUdhaar, usePayments, useSales } from '../../hooks/useKhataData'
@@ -18,6 +20,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageLoader } from '../../components/ui/PageLoader'
+import { downloadCsv, customerExportRows, transactionExportRows } from '../../lib/export'
+import { downloadReportPdf } from '../../lib/pdf'
 import type { Customer } from '../../core/types'
 
 type Period = 'today' | 'week' | 'month'
@@ -183,6 +187,54 @@ function Reports() {
 
   const maxSales = Math.max(...salesTrend.map((d) => d.value), 1)
 
+  const periodLabel = period === 'today' ? t('reports.today') : period === 'week' ? t('reports.thisWeek') : t('reports.thisMonth')
+
+  function handleExportCsv() {
+    const customerRows = customerExportRows(
+      topCustomers.map(({ customer, amount }) => ({
+        name: customer.name,
+        phone: customer.phone,
+        address: customer.address,
+        outstanding: amount,
+      })),
+    )
+    downloadCsv(`customers-${period}.csv`, customerRows)
+
+    const txRows = transactionExportRows(
+      recentTransactions.map((tx) => ({
+        type: tx.type,
+        customerName: tx.title.split(' — ')[0] ?? tx.title,
+        description: tx.title,
+        amount: tx.amount,
+        date: tx.date,
+      })),
+    )
+    downloadCsv(`transactions-${period}.csv`, txRows)
+  }
+
+  function handleExportPdf() {
+    downloadReportPdf({
+      periodLabel,
+      totalUdhaar: stats.totalUdhaar,
+      totalPayments: stats.totalPayments,
+      totalSales: stats.totalSales,
+      outstanding: stats.outstanding,
+      overdue: stats.overdue,
+      transactionCount: stats.transactionCount,
+      topCustomers: topCustomers.map(({ customer, amount }) => ({
+        name: customer.name,
+        phone: customer.phone,
+        amount,
+      })),
+      recentTransactions: recentTransactions.map((tx) => ({
+        title: tx.title,
+        amount: tx.amount,
+        date: tx.date,
+        type: tx.type,
+      })),
+    })
+  }
+
   if (
     customers === undefined ||
     udhaar === undefined ||
@@ -212,10 +264,20 @@ function Reports() {
             </p>
           </div>
 
-          <Button variant="outline" onClick={() => navigate('/reminders')}>
-            {t('reports.viewReminders')}
-            <ChevronRight size={16} />
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              <DownloadCloud size={15} />
+              {t('reports.exportCsv')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPdf}>
+              <FileText size={15} />
+              {t('reports.exportPdf')}
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/reminders')}>
+              {t('reports.viewReminders')}
+              <ChevronRight size={16} />
+            </Button>
+          </div>
         </div>
       </section>
 

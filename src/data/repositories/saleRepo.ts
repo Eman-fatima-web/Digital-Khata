@@ -22,8 +22,10 @@ export async function addSale(
     updatedAt: now,
   }
 
-  await db.sales.add(sale)
-  await enqueueSyncAction('sales', sale.id, 'create', sale)
+  await db.transaction('rw', db.sales, db.syncQueue, async () => {
+    await db.sales.add(sale)
+    await enqueueSyncAction('sales', sale.id, 'create', sale)
+  })
 
   return sale
 }
@@ -35,33 +37,39 @@ export async function updateSale(
   const existing = await db.sales.get(id)
   if (!existing) throw new Error(`Sale ${id} not found`)
 
+  const now = nowISO()
   const updated: Sale = {
     ...existing,
     ...changes,
     id,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
   }
 
-  await db.sales.put(updated)
-  await enqueueSyncAction('sales', id, 'update', updated)
+  await db.transaction('rw', db.sales, db.syncQueue, async () => {
+    await db.sales.put(updated)
+    await enqueueSyncAction('sales', id, 'update', updated)
+  })
 }
 
 export async function deleteSale(id: string): Promise<void> {
   const existing = await db.sales.get(id)
   if (!existing) throw new Error(`Sale ${id} not found`)
 
+  const now = nowISO()
   const deleted: Sale = {
     ...existing,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
     isDeleted: true,
   }
 
-  await db.sales.put(deleted)
-  await enqueueSyncAction('sales', id, 'delete', deleted)
+  await db.transaction('rw', db.sales, db.syncQueue, async () => {
+    await db.sales.put(deleted)
+    await enqueueSyncAction('sales', id, 'delete', deleted)
+  })
 }
 
 export async function getSaleById(id: string): Promise<Sale | undefined> {

@@ -112,9 +112,16 @@ export type ActionKind =
   | 'ADD_UDHAAR'
   | 'DELETE_UDHAAR'
   | 'DELETE_PAYMENT'
+  | 'DELETE_SALE'
+  | 'UPDATE_CUSTOMER'
+  | 'UPDATE_UDHAAR'
+  | 'UPDATE_PAYMENT'
   | 'SEND_REMINDER'
   | 'CREATE_CUSTOMER'
   | 'RECORD_SALE'
+  | 'NAVIGATE'
+  | 'SET_THEME'
+  | 'SET_LANGUAGE'
 
 // Metadata about an AI-proposed action. References entities by id; never a
 // copy of the financial records themselves.
@@ -131,8 +138,15 @@ export type ActionProposal = {
   udhaarRemaining?: number
   paymentId?: string
   paymentDate?: string
+  saleId?: string
+  saleDate?: string
   date?: string
-  note?: { en: string; ur: string }
+  note?: { en: string; ur: string; rom?: string }
+  // Navigation action
+  path?: string
+  // Settings action
+  setting?: 'theme' | 'language' | 'notifications'
+  settingValue?: string
 }
 
 // Persisted Khata AI chat message. Deliberately carries no sync fields:

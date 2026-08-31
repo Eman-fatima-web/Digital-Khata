@@ -41,9 +41,9 @@ export async function addPayment(
         await enqueueSyncAction('udhaar', entry.id, 'update', updated)
       }
     }
-  })
 
-  await enqueueSyncAction('payments', payment.id, 'create', payment)
+    await enqueueSyncAction('payments', payment.id, 'create', payment)
+  })
 
   return payment
 }
@@ -55,27 +55,32 @@ export async function updatePayment(
   const existing = await db.payments.get(id)
   if (!existing) throw new Error(`Payment ${id} not found`)
 
+  const now = nowISO()
   const updated: Payment = {
     ...existing,
     ...changes,
     id,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
   }
 
-  await db.payments.put(updated)
-  await enqueueSyncAction('payments', id, 'update', updated)
+  await db.transaction('rw', db.payments, db.syncQueue, async () => {
+    await db.payments.put(updated)
+    await enqueueSyncAction('payments', id, 'update', updated)
+  })
 }
 
 export async function deletePayment(id: string): Promise<void> {
   const existing = await db.payments.get(id)
   if (!existing) throw new Error(`Payment ${id} not found`)
 
+  const now = nowISO()
+
   await db.transaction('rw', db.payments, db.udhaar, db.syncQueue, async () => {
     const deleted: Payment = {
       ...existing,
-      updatedAt: nowISO(),
+      updatedAt: now,
       syncStatus: 'pending',
       version: existing.version + 1,
       isDeleted: true,
@@ -92,7 +97,7 @@ export async function deletePayment(id: string): Promise<void> {
           ...entry,
           paidAmount,
           remainingAmount: Math.max(entry.amount - paidAmount, 0),
-          updatedAt: nowISO(),
+          updatedAt: now,
           syncStatus: 'pending',
           version: entry.version + 1,
         }

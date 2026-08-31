@@ -14,13 +14,13 @@ export function localDateKey(date: Date = new Date()): string {
   return date.toLocaleDateString('en-CA')
 }
 
-export function formatCurrency(amount: number, language: 'en' | 'ur' = 'en'): string {
+export function formatCurrency(amount: number, language: 'en' | 'ur' | 'rom' = 'en'): string {
   const value = Math.abs(amount)
   const formatted = value.toLocaleString(language === 'ur' ? 'ur-PK' : 'en-PK')
   return `Rs. ${formatted}`
 }
 
-export function formatDate(date: string | Date, language: 'en' | 'ur' = 'en'): string {
+export function formatDate(date: string | Date, language: 'en' | 'ur' | 'rom' = 'en'): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleDateString(language === 'ur' ? 'ur-PK' : 'en-PK', {
     day: 'numeric',
@@ -29,7 +29,7 @@ export function formatDate(date: string | Date, language: 'en' | 'ur' = 'en'): s
   })
 }
 
-export function formatDateTime(date: string | Date, language: 'en' | 'ur' = 'en'): string {
+export function formatDateTime(date: string | Date, language: 'en' | 'ur' | 'rom' = 'en'): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleString(language === 'ur' ? 'ur-PK' : 'en-PK', {
     day: 'numeric',

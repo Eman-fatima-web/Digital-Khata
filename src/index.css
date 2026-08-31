@@ -51,20 +51,25 @@
 }
 
 [data-theme="dark"] {
-  --color-ink: #E8F2EC;
-  --color-ink-light: #C8D7D1;
-  --color-ink-muted: #8FA39D;
-  --color-ink-subtle: #5F736D;
-  --color-surface: #0B1210;
-  --color-surface-card: #132420;
-  --color-surface-hairline: #24352B;
-  --color-primary-500: #2DD4BF;
-  --color-primary-600: #5EEAD4;
-  --color-success-500: #4ADE80;
-  --color-accent-500: #F2C64B;
-  --color-danger: #F87171;
-  --color-warning: #FBBF24;
-  --color-info: #60A5FA;
+  /* Premium dark theme - deep neutral backgrounds, not pure black */
+  --color-ink: #F1F5F9;           /* Light gray for primary text - excellent readability */
+  --color-ink-light: #CBD5E1;     /* Medium gray for secondary text */
+  --color-ink-muted: #94A3B8;     /* Muted gray for tertiary text */
+  --color-ink-subtle: #64748B;    /* Subtle gray for hints */
+  
+  /* Deep neutral surfaces - comfortable for long usage */
+  --color-surface: #0F172A;       /* Deep slate blue-gray, not pure black */
+  --color-surface-card: #1E293B;  /* Elevated card surface */
+  --color-surface-hairline: #334155; /* Subtle borders */
+  
+  /* Vibrant but not harsh accent colors */
+  --color-primary-500: #14B8A6;   /* Teal - vibrant but comfortable */
+  --color-primary-600: #2DD4BF;   /* Lighter teal for hover states */
+  --color-success-500: #10B981;   /* Emerald green */
+  --color-accent-500: #F59E0B;    /* Amber gold */
+  --color-danger: #EF4444;        /* Red */
+  --color-warning: #F59E0B;       /* Amber */
+  --color-info: #3B82F6;          /* Blue */
 }
 
 @layer base {

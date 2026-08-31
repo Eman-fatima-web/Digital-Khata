@@ -1,33 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Brain, Mic, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useCustomers, usePayments, useSales, useUdhaar } from '../../hooks/useKhataData'
 import { useNetwork } from '../../hooks/useNetwork'
 import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
 import { useVoiceOutput } from '../../hooks/useVoiceOutput'
+import { useApp } from '../../hooks/useApp'
 import { CloudAIAdapter } from '../../features/ai/adapters'
 import { getResponses } from '../../features/ai/responses'
-import type { ActionKind, ActionProposal, AIResult, ConversationContext, KhataSnapshot } from '../../features/ai/types'
+import type { ActionKind, ActionProposal, AIResult, ConversationContext, KhataSnapshot, ReportCardData } from '../../features/ai/types'
 import type { TranslationKey } from '../../core/i18n'
 import { createEmptyContext, processInput } from '../../features/ai/orchestrator'
 import { getInsightHeadlines } from '../../features/ai/insights'
 import {
-  addCustomer,
-} from '../../data/repositories/customerRepo'
-import {
-  addSale,
-} from '../../data/repositories/saleRepo'
-import {
-  addPayment,
-  deletePayment,
-} from '../../data/repositories/paymentRepo'
-import {
-  addUdhaar,
-  deleteUdhaar,
-  getUdhaarByCustomer,
-} from '../../data/repositories/udhaarRepo'
+  aiCreateCustomer,
+  aiAddUdhaar,
+  aiRecordPayment,
+  aiRecordSale,
+  aiDeleteUdhaar,
+  aiDeletePayment,
+  aiDeleteSale,
+  aiUpdateCustomer,
+  aiUpdateUdhaar,
+  aiUpdatePayment,
+  aiGetUdhaarByCustomer,
+} from '../../features/ai/tools'
+import { logActionConfirmed, logActionCancelled, logActionFailed } from '../../features/ai/auditLog'
 import {
   addAIMessage,
   getAIMessageHistory,
@@ -35,6 +36,7 @@ import {
 } from '../../data/repositories/aiMessageRepo'
 import { cn, formatCurrency, formatDate, generateId, localDateKey, nowISO } from '../../lib/utils'
 import { ConfirmCard } from '../../components/ui/ConfirmCard'
+import { CustomerCard, TransactionCard, NavigationCard, ReportCard } from '../../components/ai/ActionCards'
 
 type ProposalState = 'pending' | 'executing' | 'confirmed' | 'cancelled'
 
@@ -45,6 +47,7 @@ type ChatMessage = {
   createdAt: string
   proposal?: ActionProposal
   proposalState?: ProposalState
+  cardData?: ReportCardData
 }
 
 type SpeechRecognitionResultLike = { transcript: string }
@@ -147,7 +150,7 @@ function ProactiveInsightChips({
   onSend,
 }: {
   data: KhataSnapshot
-  language: 'en' | 'ur'
+  language: 'en' | 'ur' | 'rom'
   t: (key: TranslationKey) => string
   onSend: (text: string) => void
 }) {
@@ -177,6 +180,9 @@ function AI() {
   const { t, language } = useTranslation()
   const owner = useOwner()
   const isOnline = useNetwork()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { setTheme, setLanguage } = useApp()
 
   const customers = useCustomers()
   const udhaar = useUdhaar()
@@ -199,6 +205,7 @@ function AI() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contextRef = useRef<ConversationContext>(createEmptyContext())
+  const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     const el = scrollRef.current
@@ -208,7 +215,13 @@ function AI() {
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop()
+      if (speechIntervalRef.current) clearInterval(speechIntervalRef.current)
+      voice.stop()
     }
+    // Cleanup-only effect: voice.stop() and recognitionRef.stop() are safe
+    // to call on unmount. voice is stable from useVoiceOutput but its object
+    // identity changes each render, so we intentionally omit it from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -242,6 +255,7 @@ function AI() {
     role: 'user' | 'ai',
     text: string,
     proposal?: ActionProposal,
+    cardData?: ReportCardData,
   ): string => {
     const id = generateId()
     const createdAt = nowISO()
@@ -254,6 +268,7 @@ function AI() {
         createdAt,
         proposal,
         proposalState: proposal ? 'pending' : undefined,
+        cardData,
       },
     ])
     void addAIMessage({
@@ -302,14 +317,20 @@ function AI() {
     setThinking(false)
 
     if (result.type === 'proposal') {
-      pushMessage('ai', result.text, result.proposal)
+      // Auto-execute non-destructive actions (navigation) without confirmation
+      if (result.proposal.kind === 'NAVIGATE' && result.proposal.path) {
+        navigate(result.proposal.path)
+        pushMessage('ai', result.text, result.proposal)
+      } else {
+        pushMessage('ai', result.text, result.proposal)
+      }
     } else if (result.type === 'fallback') {
       const fallbackText = getResponses(language).fallback(isOnline, cloudAvailable)
       pushMessage('ai', fallbackText)
-      if (autoSpeak) void voice.speak(fallbackText, language === 'ur' ? 'ur' : 'en')
+      if (autoSpeak) void voice.speak(fallbackText, language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en')
     } else {
-      pushMessage('ai', result.text)
-      if (autoSpeak) void voice.speak(result.text, language === 'ur' ? 'ur' : 'en')
+      pushMessage('ai', result.text, undefined, result.type === 'answer' ? result.cardData : undefined)
+      if (autoSpeak) void voice.speak(result.text, language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en')
     }
   }
 
@@ -319,6 +340,20 @@ function AI() {
     setInput('')
     void sendText(text)
   }
+
+  // Handle initial query from Dashboard navigation
+  useEffect(() => {
+    const state = location.state as { initialQuery?: string } | null
+    if (state?.initialQuery) {
+      window.history.replaceState({}, '')
+      const timer = setTimeout(() => {
+        void sendText(state.initialQuery!)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+    // sendText is stable (defined once per render cycle) — safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   const handleMic = () => {
     if (listening) {
@@ -333,7 +368,7 @@ function AI() {
     }
 
     const recognition = new Ctor()
-    recognition.lang = language === 'ur' ? 'ur-PK' : 'en-US'
+    recognition.lang = language === 'ur' ? 'ur-PK' : language === 'rom' ? 'ur-PK' : 'en-US'
     recognition.interimResults = true
     recognition.continuous = false
 
@@ -369,43 +404,42 @@ function AI() {
 
     switch (proposal.kind) {
       case 'RECORD_PAYMENT': {
-        await addPayment(
-          {
-            customerId: proposal.customerId as string,
-            udhaarId: proposal.udhaarId,
-            amount: proposal.amount as number,
-            method: proposal.method ?? 'Cash',
-            date: proposal.date ?? today,
-          },
+        const result = await aiRecordPayment(
+          proposal.customerId as string,
+          proposal.amount as number,
+          proposal.method ?? 'Cash',
+          proposal.udhaarId,
           owner,
+          proposal.date ?? today,
         )
-        const entries = await getUdhaarByCustomer(proposal.customerId as string)
+        if (!result.ok) return r.actionFailed()
+        const entries = await aiGetUdhaarByCustomer(proposal.customerId as string)
         const outstanding = entries.reduce((sum, e) => sum + e.remainingAmount, 0)
         return r.successPayment(proposal.customerName as string, proposal.amount as number, outstanding)
       }
 
       case 'ADD_UDHAAR': {
-        await addUdhaar(
-          {
-            customerId: proposal.customerId as string,
-            description: proposal.description as string,
-            amount: proposal.amount as number,
-            dueDate: undefined,
-          },
+        const result = await aiAddUdhaar(
+          proposal.customerId as string,
+          proposal.amount as number,
+          proposal.description as string,
           owner,
         )
-        const entries = await getUdhaarByCustomer(proposal.customerId as string)
+        if (!result.ok) return r.actionFailed()
+        const entries = await aiGetUdhaarByCustomer(proposal.customerId as string)
         const outstanding = entries.reduce((sum, e) => sum + e.remainingAmount, 0)
         return r.successUdhaar(proposal.customerName as string, proposal.amount as number, outstanding)
       }
 
       case 'DELETE_UDHAAR': {
-        await deleteUdhaar(proposal.udhaarId as string)
+        const result = await aiDeleteUdhaar(proposal.udhaarId as string)
+        if (!result.ok) return r.actionFailed()
         return r.successDeleteUdhaar(proposal.udhaarDescription ?? '')
       }
 
       case 'DELETE_PAYMENT': {
-        await deletePayment(proposal.paymentId as string)
+        const result = await aiDeletePayment(proposal.paymentId as string)
+        if (!result.ok) return r.actionFailed()
         return r.successDeletePayment(proposal.amount ?? 0, proposal.paymentDate ?? '')
       }
 
@@ -431,27 +465,88 @@ function AI() {
       }
 
       case 'CREATE_CUSTOMER': {
-        const customer = await addCustomer(
-          {
-            name: proposal.customerName as string,
-            phone: proposal.customerPhone ?? '',
-          },
+        const result = await aiCreateCustomer(
+          proposal.customerName as string,
+          proposal.customerPhone,
           owner,
         )
-        return r.successCreateCustomer(customer.name)
+        if (!result.ok) return r.actionFailed()
+        return r.successCreateCustomer(result.data.name)
       }
 
       case 'RECORD_SALE': {
-        await addSale(
-          {
-            customerId: proposal.customerId,
-            amount: proposal.amount as number,
-            description: proposal.description as string,
-            date: proposal.date ?? today,
-          },
+        const result = await aiRecordSale(
+          proposal.customerId,
+          proposal.amount as number,
+          proposal.description as string,
           owner,
+          proposal.date ?? today,
         )
+        if (!result.ok) return r.actionFailed()
         return r.successSale(proposal.customerName ?? '', proposal.amount as number)
+      }
+
+      case 'DELETE_SALE': {
+        const result = await aiDeleteSale(proposal.saleId as string)
+        if (!result.ok) return r.actionFailed()
+        return r.successDeleteSale(proposal.amount ?? 0, proposal.saleDate ?? '')
+      }
+
+      case 'UPDATE_CUSTOMER': {
+        const result = await aiUpdateCustomer(
+          proposal.customerId as string,
+          { name: proposal.customerName },
+        )
+        if (!result.ok) return r.actionFailed()
+        return r.successUpdateCustomer(proposal.customerName as string)
+      }
+
+      case 'UPDATE_UDHAAR': {
+        const result = await aiUpdateUdhaar(
+          proposal.udhaarId as string,
+          { amount: proposal.amount, description: proposal.description },
+        )
+        if (!result.ok) return r.actionFailed()
+        return r.successUpdateUdhaar(proposal.udhaarDescription ?? '')
+      }
+
+      case 'UPDATE_PAYMENT': {
+        const result = await aiUpdatePayment(
+          proposal.paymentId as string,
+          { amount: proposal.amount, method: proposal.method, date: proposal.date ?? proposal.paymentDate },
+        )
+        if (!result.ok) return r.actionFailed()
+        return r.successUpdatePayment(proposal.amount ?? 0, proposal.paymentDate ?? '')
+      }
+
+      case 'NAVIGATE': {
+        if (proposal.path) {
+          navigate(proposal.path)
+          return language === 'ur'
+            ? `${proposal.path.slice(1)} صفحہ کھول دیا گیا۔`
+            : `Opened the ${proposal.path.slice(1)} page.`
+        }
+        return r.actionFailed()
+      }
+
+      case 'SET_THEME': {
+        if (proposal.setting === 'theme' && (proposal.settingValue === 'light' || proposal.settingValue === 'dark')) {
+          setTheme(proposal.settingValue)
+          return language === 'ur'
+            ? `تھیم ${proposal.settingValue === 'dark' ? 'ڈارک' : 'لائٹ'} پر تبدیل ہو گئی۔`
+            : `Theme switched to ${proposal.settingValue}.`
+        }
+        return r.actionFailed()
+      }
+
+      case 'SET_LANGUAGE': {
+        if (proposal.setting === 'language' && (proposal.settingValue === 'en' || proposal.settingValue === 'ur')) {
+          setLanguage(proposal.settingValue)
+          return proposal.settingValue === 'ur'
+            ? 'زبان اردو پر تبدیل ہو گئی۔'
+            : 'Language switched to English.'
+        }
+        return r.actionFailed()
       }
     }
   }
@@ -470,6 +565,7 @@ function AI() {
         prev.map((m) => (m.id === messageId ? { ...m, proposalState: 'confirmed' } : m)),
       )
       void updateAIMessageState(messageId, 'confirmed')
+      logActionConfirmed(message.proposal)
       pushMessage('ai', text)
       // Focus management: scroll to the new response
       setTimeout(() => {
@@ -482,39 +578,52 @@ function AI() {
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, proposalState: 'pending' } : m)),
       )
+      logActionFailed(message.proposal, error instanceof Error ? error.message : 'Unknown error')
       pushMessage('ai', getResponses(language).actionFailed())
     }
   }
 
   const handleCancel = (messageId: string) => {
+    const message = messages.find((m) => m.id === messageId)
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, proposalState: 'cancelled' } : m)),
     )
     void updateAIMessageState(messageId, 'cancelled')
+    if (message?.proposal) {
+      logActionCancelled(message.proposal)
+    }
   }
 
   const handleSpeak = async (messageId: string, text: string) => {
     if (speakingMessageId) {
       // Stop current speech
       voice.stop()
+      if (speechIntervalRef.current) {
+        clearInterval(speechIntervalRef.current)
+        speechIntervalRef.current = null
+      }
       setSpeakingMessageId(null)
       return
     }
 
     // Start speaking
     setSpeakingMessageId(messageId)
-    const voiceLanguage = language === 'ur' ? 'ur' : 'en'
+    const voiceLanguage = language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en'
     const success = await voice.speak(text, voiceLanguage)
 
     if (!success && voice.state !== 'speaking') {
       // Speech failed or not available
       setSpeakingMessageId(null)
     } else {
-      // Wait for speech to finish
-      const checkInterval = setInterval(() => {
+      // Wait for speech to finish — interval tracked in ref for cleanup
+      if (speechIntervalRef.current) clearInterval(speechIntervalRef.current)
+      speechIntervalRef.current = setInterval(() => {
         if (!voice.isSpeaking()) {
           setSpeakingMessageId(null)
-          clearInterval(checkInterval)
+          if (speechIntervalRef.current) {
+            clearInterval(speechIntervalRef.current)
+            speechIntervalRef.current = null
+          }
         }
       }, 100)
     }
@@ -525,9 +634,16 @@ function AI() {
     ADD_UDHAAR: t('ai.actionUdhaar'),
     DELETE_UDHAAR: t('ai.actionDeleteUdhaar'),
     DELETE_PAYMENT: t('ai.actionDeletePayment'),
+    DELETE_SALE: t('ai.actionDeleteSale'),
+    UPDATE_CUSTOMER: t('ai.actionUpdateCustomer'),
+    UPDATE_UDHAAR: t('ai.actionUpdateUdhaar'),
+    UPDATE_PAYMENT: t('ai.actionUpdatePayment'),
     SEND_REMINDER: t('ai.actionReminder'),
     CREATE_CUSTOMER: t('ai.actionCreateCustomer'),
     RECORD_SALE: t('ai.actionRecordSale'),
+    NAVIGATE: t('ai.actionNavigate'),
+    SET_THEME: t('ai.actionSetTheme'),
+    SET_LANGUAGE: t('ai.actionSetLanguage'),
   }
 
   const buildRows = (proposal: ActionProposal) => {
@@ -555,6 +671,12 @@ function AI() {
         label: t('ai.fieldDate'),
         value: formatDate(proposal.paymentDate ?? (proposal.date as string)),
       })
+    }
+    if (proposal.path) {
+      rows.push({ label: t('ai.fieldPage'), value: proposal.path.slice(1) })
+    }
+    if (proposal.setting && proposal.settingValue) {
+      rows.push({ label: t('ai.fieldSetting'), value: `${proposal.setting}: ${proposal.settingValue}` })
     }
     return rows
   }
@@ -599,8 +721,55 @@ function AI() {
     ]
   }, [messages.length, udhaar, lastIntent, t])
 
+  /** Determine if a proposal kind requires explicit user confirmation */
+  const requiresActionConfirmation = (kind: ActionKind): boolean => {
+    // READ actions don't need confirmation
+    // WRITE and HIGH_RISK actions need confirmation
+    return kind !== 'NAVIGATE' // Navigation is non-destructive, no confirmation needed
+  }
+
+  /** Render structured action card based on proposal type */
+  const renderActionCard = (proposal: ActionProposal): ReactNode => {
+    switch (proposal.kind) {
+      case 'CREATE_CUSTOMER':
+        return (
+          <CustomerCard
+            name={proposal.customerName ?? 'New Customer'}
+            phone={proposal.customerPhone}
+            outstanding={0}
+          />
+        )
+
+      case 'ADD_UDHAAR':
+      case 'RECORD_PAYMENT':
+      case 'RECORD_SALE':
+        return (
+          <TransactionCard
+            type={proposal.kind === 'ADD_UDHAAR' ? 'udhaar' : proposal.kind === 'RECORD_PAYMENT' ? 'payment' : 'sale'}
+            customerName={proposal.customerName}
+            amount={proposal.amount ?? 0}
+            description={proposal.description}
+            date={proposal.date ?? localDateKey()}
+            method={proposal.method}
+          />
+        )
+
+      case 'NAVIGATE':
+        return proposal.path ? (
+          <NavigationCard
+            page={proposal.path.slice(1)}
+            path={proposal.path}
+            description={proposal.note?.[language] ?? proposal.note?.en}
+          />
+        ) : null
+
+      default:
+        return null
+    }
+  }
+
   return (
-    <div className="mx-auto flex h-[calc(100dvh-200px)] min-h-[430px] w-full max-w-3xl flex-col lg:h-[calc(100dvh-125px)]">
+    <div className="mx-auto flex min-h-[calc(100dvh-200px)] w-full max-w-3xl flex-col lg:min-h-[calc(100dvh-125px)]">
       <section className="flex items-center justify-between gap-3 rounded-2xl border border-surface-hairline bg-surface-card px-4 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
@@ -676,12 +845,25 @@ function AI() {
               onSpeak={voice.isAvailable() ? handleSpeak : undefined}
               voiceAvailable={voice.isAvailable()}
             >
-              {message.proposal && (
+              {/* Render report card if present */}
+              {message.cardData?.kind === 'report' && (
+                <ReportCard
+                  title={message.cardData.title}
+                  totalAmount={message.cardData.totalAmount}
+                  count={message.cardData.count}
+                  period={message.cardData.period}
+                  items={message.cardData.items}
+                />
+              )}
+              {/* Render structured action card based on proposal type */}
+              {message.proposal && renderActionCard(message.proposal)}
+              {/* Render confirmation card for write/high-risk actions */}
+              {message.proposal && requiresActionConfirmation(message.proposal.kind) && (
                 <ConfirmCard
                   title={t('ai.confirmTitle')}
                   description={t('ai.confirmDescription')}
                   rows={buildRows(message.proposal)}
-                  note={message.proposal.note?.[language]}
+                  note={message.proposal.note?.[language] ?? message.proposal.note?.en}
                   state={message.proposalState ?? 'pending'}
                   confirmLabel={t('common.confirm')}
                   cancelLabel={t('common.cancel')}
@@ -689,7 +871,8 @@ function AI() {
                   cancelledLabel={t('ai.cancelled')}
                   danger={
                     message.proposal.kind === 'DELETE_UDHAAR' ||
-                    message.proposal.kind === 'DELETE_PAYMENT'
+                    message.proposal.kind === 'DELETE_PAYMENT' ||
+                    message.proposal.kind === 'DELETE_SALE'
                   }
                   onConfirm={() => void handleConfirm(message.id)}
                   onCancel={() => handleCancel(message.id)}

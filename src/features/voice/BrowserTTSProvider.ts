@@ -12,6 +12,8 @@ export class BrowserTTSProvider implements VoiceProvider {
   private cachedVoice: SpeechSynthesisVoice | null = null
   private cachedVoiceLanguage: string | null = null
   private speechQueue: Array<{ text: string; language: VoiceLanguage }> = []
+  private safetyTimer: ReturnType<typeof setTimeout> | null = null
+  private static readonly MAX_QUEUE_SIZE = 10
 
   isAvailable(): boolean {
     if (typeof window === 'undefined') return false
@@ -31,7 +33,15 @@ export class BrowserTTSProvider implements VoiceProvider {
       window.speechSynthesis.cancel()
       this.isSpeakingFlag = false
     }
+    this.clearSafetyTimer()
     this.speechQueue = []
+  }
+
+  private clearSafetyTimer(): void {
+    if (this.safetyTimer !== null) {
+      clearTimeout(this.safetyTimer)
+      this.safetyTimer = null
+    }
   }
 
   isSpeaking(): boolean {
@@ -43,8 +53,11 @@ export class BrowserTTSProvider implements VoiceProvider {
       throw new Error('Speech Synthesis not available')
     }
 
-    // If already speaking, queue this utterance
+    // If already speaking, queue this utterance (capped at MAX_QUEUE_SIZE)
     if (this.isSpeakingFlag) {
+      if (this.speechQueue.length >= BrowserTTSProvider.MAX_QUEUE_SIZE) {
+        this.speechQueue.shift()
+      }
       this.speechQueue.push({ text, language })
       return
     }
@@ -58,7 +71,7 @@ export class BrowserTTSProvider implements VoiceProvider {
     // Set language
     if (language === 'ur') {
       utterance.lang = 'ur-PK'
-    } else if (language === 'en-UR') {
+    } else if (language === 'en-UR' || language === 'rom') {
       utterance.lang = 'ur-PK'
     } else {
       utterance.lang = 'en-US'
@@ -77,8 +90,18 @@ export class BrowserTTSProvider implements VoiceProvider {
 
     this.isSpeakingFlag = true
 
+    // Safety timeout: if onend/onerror never fire (e.g., tab backgrounded),
+    // clear the flag after a reasonable maximum duration.
+    this.clearSafetyTimer()
+    const maxDurationMs = Math.max(text.length * 100 + 10_000, 30_000)
+    this.safetyTimer = setTimeout(() => {
+      this.isSpeakingFlag = false
+      this.speechQueue = []
+    }, maxDurationMs)
+
     return new Promise((resolve, reject) => {
       utterance.onend = () => {
+        this.clearSafetyTimer()
         this.isSpeakingFlag = false
         // Process next queued utterance
         const next = this.speechQueue.shift()
@@ -89,6 +112,7 @@ export class BrowserTTSProvider implements VoiceProvider {
       }
 
       utterance.onerror = (event) => {
+        this.clearSafetyTimer()
         this.isSpeakingFlag = false
         this.speechQueue = []
         reject(new Error(`TTS error: ${event.error}`))
@@ -127,7 +151,7 @@ export class BrowserTTSProvider implements VoiceProvider {
       return null
     }
 
-    if (language === 'ur' || language === 'en-UR') {
+    if (language === 'ur' || language === 'en-UR' || language === 'rom') {
       // Try to find Urdu voice
       const urduVoice = voices.find(
         (v) =>

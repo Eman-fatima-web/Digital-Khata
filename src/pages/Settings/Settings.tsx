@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ShieldCheck,
   Lock,
@@ -8,10 +9,12 @@ import {
   Languages,
   Info,
   WifiOff,
-  Check,
+  LogOut,
+  Cloud,
 } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
+import { useAuth } from '../../context/AuthProvider'
 import { useTranslation } from '../../core/i18n'
 import { clearPin, setPin, verifyPin } from '../../security/pin'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
@@ -19,13 +22,15 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { PinPad } from '../../components/ui/PinPad'
 import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
+import { useToast } from '../../components/ui/Toast'
 
 type PinFlow = null | 'create' | 'change-current' | 'change-new' | 'change-confirm' | 'remove-current'
-type Toast = { kind: 'success' | 'error'; text: string } | null
 
 function Settings() {
   const { t, language } = useTranslation()
   const { pinEnabled, setPinEnabled, lock, theme, toggleTheme } = useApp()
+  const { isAuthenticated, user, logout } = useAuth()
+  const navigate = useNavigate()
 
   const [flow, setFlow] = useState<PinFlow>(null)
   const [origin, setOrigin] = useState<'create' | 'change'>('create')
@@ -33,14 +38,13 @@ function Settings() {
   const [pad, setPad] = useState({ key: 0, shake: false })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<Toast>(null)
+  const { toast } = useToast()
 
   const bumpPad = (shake: boolean) =>
     setPad((prev) => ({ key: prev.key + 1, shake }))
 
   const showToast = (kind: 'success' | 'error', text: string) => {
-    setToast({ kind, text })
-    setTimeout(() => setToast(null), 3000)
+    toast(kind, text)
   }
 
   const resetFlow = () => {
@@ -160,19 +164,6 @@ function Settings() {
         </p>
       </section>
 
-      {toast && (
-        <div
-          className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-            toast.kind === 'success'
-              ? 'border-success-200 bg-success-50 text-success-600'
-              : 'border-danger/30 bg-danger/10 text-danger'
-          }`}
-        >
-          {toast.kind === 'success' && <Check size={16} />}
-          {toast.text}
-        </div>
-      )}
-
       <Card>
         <CardHeader className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
@@ -259,6 +250,50 @@ function Settings() {
         </CardHeader>
         <CardContent>
           <LanguageSwitcher />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+            <Cloud size={20} />
+          </div>
+          <div>
+            <CardTitle>Cloud Account</CardTitle>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              {isAuthenticated ? 'Sync your data across devices' : 'Login to enable cloud sync'}
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isAuthenticated ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm">
+                <p className="font-semibold text-ink">{user?.email}</p>
+                <p className="text-xs text-ink-muted">Connected</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  logout()
+                  navigate('/login')
+                }}
+              >
+                <LogOut size={15} />
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => navigate('/login')}>
+                Login
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
+                Create Account
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

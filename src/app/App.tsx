@@ -3,8 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 import { AppLayout } from './layout/AppLayout'
 import { LockScreen } from '../features/lock/LockScreen'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useApp } from '../hooks/useApp'
 
+const Login = lazy(() => import('../pages/Auth/Login'))
+const Register = lazy(() => import('../pages/Auth/Register'))
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('../pages/Customers/Customers'))
 const CustomerDetail = lazy(() => import('../pages/Customers/CustomerDetail'))
@@ -23,27 +26,31 @@ function App() {
 
   return (
     <BrowserRouter>
-      {isLocked ? (
-        <LockScreen />
-      ) : (
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/udhaar" element={<Udhaar />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/sales" element={<Sales />} />
-            <Route path="/ai" element={<AI />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/reminders" element={<Reminders />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/conflicts" element={<Conflicts />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      )}
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          element={
+            <ProtectedRoute>
+              {isLocked ? <LockScreen /> : <AppLayout />}
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/udhaar" element={<Udhaar />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/sales" element={<Sales />} />
+          <Route path="/ai" element={<AI />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/reminders" element={<Reminders />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/conflicts" element={<Conflicts />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+      </Routes>
     </BrowserRouter>
   )
 }

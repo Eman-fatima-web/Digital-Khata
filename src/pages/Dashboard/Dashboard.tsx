@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Wallet,
   ArrowDownLeft,
@@ -10,13 +10,16 @@ import {
   Clock,
   ShoppingCart,
   Brain,
+  Send,
+  Bell,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { useCustomers, useUdhaar, usePayments, useSales } from '../../hooks/useKhataData'
 import { useTranslation } from '../../core/i18n'
-import { formatCurrency, formatDate, localDateKey } from '../../lib/utils'
+import { cn, formatCurrency, formatDate, localDateKey } from '../../lib/utils'
 import { getInsightHeadlines } from '../../features/ai/insights'
+import { generateProactiveInsights, isProactiveEnabled } from '../../features/ai/proactiveInsights'
 import { StatCard } from '../../components/ui/StatCard'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -117,6 +120,38 @@ function Dashboard() {
     [customers, udhaar, payments, sales, language],
   )
 
+  const proactiveInsights = useMemo(
+    () =>
+      isProactiveEnabled()
+        ? generateProactiveInsights(
+            {
+              customers: customers ?? [],
+              udhaar: udhaar ?? [],
+              payments: payments ?? [],
+              sales: sales ?? [],
+            },
+            language,
+          )
+        : [],
+    [customers, udhaar, payments, sales, language],
+  )
+
+  const [aiInput, setAiInput] = useState('')
+
+  const aiPrompts = language === 'ur'
+    ? ['آج کا حساب بتاؤ', 'احمد کا بیلنس', 'نیا گاہک شامل کرو', 'کس کا ادھار اوورڈو ہے؟']
+    : ['Aaj ka hisaab batao', 'Ahmed ka balance', 'New customer add karo', 'Kis ka udhaar overdue hai?']
+
+  const handleAiSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!aiInput.trim()) return
+    navigate('/ai', { state: { initialQuery: aiInput.trim() } })
+  }
+
+  const handlePromptClick = (prompt: string) => {
+    navigate('/ai', { state: { initialQuery: prompt } })
+  }
+
   if (isLoading) {
     return <PageLoader />
   }
@@ -132,6 +167,77 @@ function Dashboard() {
           {t('dashboard.subtitle')}
         </p>
       </section>
+
+      {/* AI Hero Section */}
+      <section className="rounded-2xl border border-surface-hairline bg-gradient-to-br from-primary-50 to-surface-card p-5 shadow-sm sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
+            <Brain size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-ink sm:text-lg">
+              {language === 'ur' ? 'آج میں آپ کی کیا مدد کر سکتا ہوں؟' : 'How can I help you today?'}
+            </h2>
+            <form onSubmit={handleAiSubmit} className="mt-3 flex items-center gap-2">
+              <input
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                placeholder={language === 'ur' ? 'سوال پوچھیں یا حکم دیں...' : 'Ask a question or give a command...'}
+                className="min-w-0 flex-1 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              />
+              <button
+                type="submit"
+                disabled={!aiInput.trim()}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white shadow-sm transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Send size={16} />
+              </button>
+            </form>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {aiPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => handlePromptClick(prompt)}
+                  className="rounded-full border border-surface-hairline bg-surface-card px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-primary-300 hover:text-primary-600"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Proactive Insights */}
+      {proactiveInsights.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Bell size={16} className="text-primary-500" />
+            <h3 className="text-sm font-semibold text-ink">
+              {language === 'ur' ? 'آج کے جائزے' : 'Today at a glance'}
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {proactiveInsights.slice(0, 4).map((insight) => (
+              <div
+                key={insight.id}
+                className={cn(
+                  'flex items-start gap-3 rounded-xl border p-3 text-sm',
+                  insight.severity === 'warning' && 'border-warning/20 bg-warning/5',
+                  insight.severity === 'success' && 'border-success-200 bg-success-50',
+                  insight.severity === 'info' && 'border-surface-hairline bg-surface-card',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-ink">{insight.title}</p>
+                  <p className="text-xs text-ink-muted">{insight.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

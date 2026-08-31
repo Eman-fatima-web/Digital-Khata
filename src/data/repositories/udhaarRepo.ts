@@ -24,8 +24,10 @@ export async function addUdhaar(
     updatedAt: now,
   }
 
-  await db.udhaar.add(entry)
-  await enqueueSyncAction('udhaar', entry.id, 'create', entry)
+  await db.transaction('rw', db.udhaar, db.syncQueue, async () => {
+    await db.udhaar.add(entry)
+    await enqueueSyncAction('udhaar', entry.id, 'create', entry)
+  })
 
   return entry
 }
@@ -37,33 +39,39 @@ export async function updateUdhaar(
   const existing = await db.udhaar.get(id)
   if (!existing) throw new Error(`Udhaar ${id} not found`)
 
+  const now = nowISO()
   const updated: UdhaarEntry = {
     ...existing,
     ...changes,
     id,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
   }
 
-  await db.udhaar.put(updated)
-  await enqueueSyncAction('udhaar', id, 'update', updated)
+  await db.transaction('rw', db.udhaar, db.syncQueue, async () => {
+    await db.udhaar.put(updated)
+    await enqueueSyncAction('udhaar', id, 'update', updated)
+  })
 }
 
 export async function deleteUdhaar(id: string): Promise<void> {
   const existing = await db.udhaar.get(id)
   if (!existing) throw new Error(`Udhaar ${id} not found`)
 
+  const now = nowISO()
   const deleted: UdhaarEntry = {
     ...existing,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
     isDeleted: true,
   }
 
-  await db.udhaar.put(deleted)
-  await enqueueSyncAction('udhaar', id, 'delete', deleted)
+  await db.transaction('rw', db.udhaar, db.syncQueue, async () => {
+    await db.udhaar.put(deleted)
+    await enqueueSyncAction('udhaar', id, 'delete', deleted)
+  })
 }
 
 export async function getUdhaarById(id: string): Promise<UdhaarEntry | undefined> {

@@ -88,6 +88,27 @@ describe('detectIntent — new intents', () => {
     expect(detectIntent('kya kar sakte ho')).toBe('HELP')
     expect(detectIntent('what can you do')).toBe('HELP')
   })
+
+  it('detects RECEIVED_REPORT', () => {
+    expect(detectIntent('received report dikhao')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('kitni payment receive hui')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('aaj ki received payments report')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('received hui payment ka hisaab')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('payment received report')).toBe('RECEIVED_REPORT')
+  })
+
+  it('detects SEND_OVERDUE_REMINDERS', () => {
+    expect(detectIntent('send overdue reminders')).toBe('SEND_OVERDUE_REMINDERS')
+    expect(detectIntent('sab ko reminder bhejo')).toBe('SEND_OVERDUE_REMINDERS')
+    expect(detectIntent('remind all customers')).toBe('SEND_OVERDUE_REMINDERS')
+    expect(detectIntent('sab ko yaad dila do')).toBe('SEND_OVERDUE_REMINDERS')
+    expect(detectIntent('send overdue')).toBe('SEND_OVERDUE_REMINDERS')
+  })
+
+  it('distinguishes SEND_REMINDER (single) from SEND_OVERDUE_REMINDERS (batch)', () => {
+    expect(detectIntent('Ahmed ko reminder bhejo')).toBe('SEND_REMINDER')
+    expect(detectIntent('send reminders to all')).toBe('SEND_OVERDUE_REMINDERS')
+  })
 })
 
 describe('detectIntent — mixed language', () => {
@@ -112,5 +133,27 @@ describe('detectIntent — priority ordering', () => {
 
   it('HELP is detected before UNKNOWN', () => {
     expect(detectIntent('help please')).toBe('HELP')
+  })
+})
+
+describe('detectIntent — negation blocking', () => {
+  it('blocks DELETE when negated in English', () => {
+    expect(detectIntent("don't delete Ahmed's payment")).toBe('UNKNOWN')
+  })
+
+  it('blocks DELETE when negated in Roman Urdu', () => {
+    expect(detectIntent('mat karo delete Ahmed ka udhaar')).toBe('UNKNOWN')
+  })
+
+  it('blocks ADD_UDHAAR when negated', () => {
+    expect(detectIntent('nahi udhaar dena Ahmed ko')).toBe('UNKNOWN')
+  })
+
+  it('blocks RECORD_PAYMENT when negated', () => {
+    expect(detectIntent('do not receive payment from Ahmed')).toBe('UNKNOWN')
+  })
+
+  it('does not block query intents when negated', () => {
+    expect(detectIntent("don't show me Ahmed's balance")).toBe('CUSTOMER_BALANCE')
   })
 })

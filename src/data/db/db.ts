@@ -50,6 +50,23 @@ export class KhataDB extends Dexie {
     this.version(4).stores({
       syncConflicts: 'id, table, recordId, createdAt',
     })
+
+    // Version 5: Optimized indexes for pagination and filtering
+    // Compound indexes for efficient filtered queries
+    this.version(5).stores({
+      customers:
+        'id, name, phone, userId, shopId, syncStatus, createdAt, updatedAt, isDeleted, [name+isDeleted], [phone+isDeleted], [createdAt+isDeleted]',
+      udhaar:
+        'id, customerId, userId, shopId, syncStatus, dueDate, remainingAmount, createdAt, updatedAt, isDeleted, [customerId+isDeleted], [dueDate+isDeleted], [createdAt+isDeleted]',
+      payments:
+        'id, customerId, udhaarId, userId, shopId, syncStatus, date, createdAt, updatedAt, isDeleted, [customerId+isDeleted], [date+isDeleted]',
+      sales:
+        'id, customerId, userId, shopId, syncStatus, date, createdAt, updatedAt, isDeleted, [customerId+isDeleted], [date+isDeleted]',
+      syncQueue:
+        'id, table, recordId, createdAt, attempts, status',
+      syncConflicts: 'id, table, recordId, createdAt',
+      aiMessages: 'id, userId, shopId, [userId+shopId], createdAt',
+    })
   }
 }
 

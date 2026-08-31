@@ -1,8 +1,8 @@
 import type { Customer, KhataEntity, Payment, Sale, UdhaarEntry } from '../../core/types'
-import { addCustomer, deleteCustomer, getCustomerById, searchCustomers } from '../../data/repositories/customerRepo'
-import { addUdhaar, deleteUdhaar, getUdhaarByCustomer } from '../../data/repositories/udhaarRepo'
-import { addPayment, deletePayment, getPaymentsByCustomer } from '../../data/repositories/paymentRepo'
-import { addSale } from '../../data/repositories/saleRepo'
+import { addCustomer, deleteCustomer, getCustomerById, searchCustomers, updateCustomer } from '../../data/repositories/customerRepo'
+import { addUdhaar, deleteUdhaar, getUdhaarByCustomer, updateUdhaar } from '../../data/repositories/udhaarRepo'
+import { addPayment, deletePayment, getPaymentsByCustomer, updatePayment } from '../../data/repositories/paymentRepo'
+import { addSale, deleteSale } from '../../data/repositories/saleRepo'
 import { matchCustomers } from './nlp'
 
 type Owner = { userId: string; shopId: string }
@@ -10,6 +10,107 @@ type Owner = { userId: string; shopId: string }
 export type ToolResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; message: string }
+
+// Tool permission levels for security enforcement
+export type ToolPermission = 'read' | 'write' | 'high_risk'
+
+export type ToolMetadata = {
+  name: string
+  permission: ToolPermission
+  requiresConfirmation: boolean
+  description: string
+}
+
+// Permission registry — maps tool names to their metadata
+export const TOOL_REGISTRY: Record<string, ToolMetadata> = {
+  // READ tools — no confirmation needed
+  searchCustomer: { name: 'searchCustomer', permission: 'read', requiresConfirmation: false, description: 'Search customers by name or phone' },
+  getCustomer: { name: 'getCustomer', permission: 'read', requiresConfirmation: false, description: 'Get customer details by ID' },
+  getCustomerBalance: { name: 'getCustomerBalance', permission: 'read', requiresConfirmation: false, description: 'Get customer outstanding balance' },
+  getCustomerLedger: { name: 'getCustomerLedger', permission: 'read', requiresConfirmation: false, description: 'Get customer transaction history' },
+  getPaymentsByCustomer: { name: 'getPaymentsByCustomer', permission: 'read', requiresConfirmation: false, description: 'Get customer payment history' },
+  getUdhaarByCustomer: { name: 'getUdhaarByCustomer', permission: 'read', requiresConfirmation: false, description: 'Get customer udhaar entries' },
+
+  // WRITE tools — confirmation required
+  createCustomer: { name: 'createCustomer', permission: 'write', requiresConfirmation: true, description: 'Create a new customer' },
+  addUdhaar: { name: 'addUdhaar', permission: 'write', requiresConfirmation: true, description: 'Add udhaar entry for customer' },
+  recordPayment: { name: 'recordPayment', permission: 'write', requiresConfirmation: true, description: 'Record a payment for customer' },
+  recordSale: { name: 'recordSale', permission: 'write', requiresConfirmation: true, description: 'Record a sale' },
+
+  // HIGH RISK tools — explicit confirmation required, logged
+  deleteCustomer: { name: 'deleteCustomer', permission: 'high_risk', requiresConfirmation: true, description: 'Delete a customer (soft delete)' },
+  deleteUdhaar: { name: 'deleteUdhaar', permission: 'high_risk', requiresConfirmation: true, description: 'Delete an udhaar entry (soft delete)' },
+  deletePayment: { name: 'deletePayment', permission: 'high_risk', requiresConfirmation: true, description: 'Delete a payment (soft delete)' },
+  deleteSale: { name: 'deleteSale', permission: 'high_risk', requiresConfirmation: true, description: 'Delete a sale (soft delete)' },
+
+  // UPDATE tools — confirmation required
+  updateCustomer: { name: 'updateCustomer', permission: 'write', requiresConfirmation: true, description: 'Update customer details' },
+  updateUdhaar: { name: 'updateUdhaar', permission: 'write', requiresConfirmation: true, description: 'Update an udhaar entry' },
+  updatePayment: { name: 'updatePayment', permission: 'write', requiresConfirmation: true, description: 'Update a payment' },
+}
+
+/** Check if a tool requires confirmation before execution */
+export function requiresConfirmation(toolName: string): boolean {
+  return TOOL_REGISTRY[toolName]?.requiresConfirmation ?? true
+}
+
+/** Get the permission level for a tool */
+export function getToolPermission(toolName: string): ToolPermission {
+  return TOOL_REGISTRY[toolName]?.permission ?? 'high_risk'
+}
+
+/** Validate tool arguments — returns error message if invalid, null if valid */
+export function validateToolArgs(toolName: string, args: Record<string, unknown>): string | null {
+  switch (toolName) {
+    case 'createCustomer':
+      if (!args.name || typeof args.name !== 'string' || args.name.trim().length === 0) {
+        return 'Customer name is required'
+      }
+      if (args.phone !== undefined && typeof args.phone !== 'string') {
+        return 'Phone must be a string'
+      }
+      return null
+
+    case 'addUdhaar':
+    case 'recordPayment':
+    case 'recordSale':
+      if (typeof args.amount !== 'number' || args.amount <= 0) {
+        return 'Amount must be a positive number'
+      }
+      if (args.amount > 999999999) {
+        return 'Amount exceeds maximum allowed value'
+      }
+      return null
+
+    case 'deleteCustomer':
+    case 'deleteUdhaar':
+    case 'deletePayment':
+    case 'deleteSale':
+      if (!args.id || typeof args.id !== 'string') {
+        return 'Record ID is required for deletion'
+      }
+      return null
+
+    case 'updateCustomer':
+      if (!args.id || typeof args.id !== 'string') {
+        return 'Customer ID is required'
+      }
+      return null
+
+    case 'updateUdhaar':
+    case 'updatePayment':
+      if (!args.id || typeof args.id !== 'string') {
+        return 'Record ID is required'
+      }
+      if (args.amount !== undefined && (typeof args.amount !== 'number' || args.amount <= 0)) {
+        return 'Amount must be a positive number'
+      }
+      return null
+
+    default:
+      return null
+  }
+}
 
 export async function aiCreateCustomer(
   name: string,
@@ -54,10 +155,11 @@ export async function aiRecordPayment(
   method: Payment['method'],
   udhaarId: string | undefined,
   owner: Owner,
+  date?: string,
 ): Promise<ToolResult<Payment>> {
   try {
     const payment = await addPayment(
-      { customerId, amount, method, udhaarId, date: new Date().toISOString().split('T')[0] },
+      { customerId, amount, method, udhaarId, date: date ?? new Date().toISOString().split('T')[0] },
       owner,
     )
     return { ok: true, data: payment }
@@ -71,10 +173,11 @@ export async function aiRecordSale(
   amount: number,
   description: string,
   owner: Owner,
+  date?: string,
 ): Promise<ToolResult<Sale>> {
   try {
     const sale = await addSale(
-      { customerId, amount, description, date: new Date().toISOString().split('T')[0] },
+      { customerId, amount, description, date: date ?? new Date().toISOString().split('T')[0] },
       owner,
     )
     return { ok: true, data: sale }
@@ -107,6 +210,53 @@ export async function aiDeleteCustomer(customerId: string): Promise<ToolResult<v
     return { ok: true, data: undefined }
   } catch (error) {
     return { ok: false, error: 'repo-error', message: `Failed to delete customer: ${error}` }
+  }
+}
+
+export async function aiDeleteSale(saleId: string): Promise<ToolResult<void>> {
+  try {
+    await deleteSale(saleId)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to delete sale: ${error}` }
+  }
+}
+
+export async function aiUpdateCustomer(
+  customerId: string,
+  changes: { name?: string; phone?: string; address?: string },
+): Promise<ToolResult<Customer>> {
+  try {
+    await updateCustomer(customerId, changes)
+    const updated = await getCustomerById(customerId)
+    if (!updated) return { ok: false, error: 'not-found', message: 'Customer not found after update' }
+    return { ok: true, data: updated }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to update customer: ${error}` }
+  }
+}
+
+export async function aiUpdateUdhaar(
+  udhaarId: string,
+  changes: { amount?: number; description?: string; dueDate?: string },
+): Promise<ToolResult<void>> {
+  try {
+    await updateUdhaar(udhaarId, changes)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to update udhaar: ${error}` }
+  }
+}
+
+export async function aiUpdatePayment(
+  paymentId: string,
+  changes: { amount?: number; method?: Payment['method']; date?: string },
+): Promise<ToolResult<void>> {
+  try {
+    await updatePayment(paymentId, changes)
+    return { ok: true, data: undefined }
+  } catch (error) {
+    return { ok: false, error: 'repo-error', message: `Failed to update payment: ${error}` }
   }
 }
 

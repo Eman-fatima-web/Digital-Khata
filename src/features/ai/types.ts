@@ -17,12 +17,21 @@ export type KhataSnapshot = {
 }
 
 export type AIResult =
-  | { type: 'answer'; text: string }
+  | { type: 'answer'; text: string; cardData?: ReportCardData }
   | { type: 'proposal'; text: string; proposal: ActionProposal }
   | { type: 'clarification'; text: string }
   | { type: 'fallback' }
 
-export type AILanguage = 'en' | 'ur'
+export type ReportCardData = {
+  kind: 'report'
+  title: string
+  period: string
+  totalAmount: number
+  count: number
+  items: { label: string; value: number }[]
+}
+
+export type AILanguage = 'en' | 'ur' | 'rom'
 
 export type ConversationTurn = {
   role: 'user' | 'ai'
@@ -38,6 +47,17 @@ export type ConversationContext = {
   lastCustomerName?: string
   lastAmount?: number
   lastIntent?: string
+  // Phase 3: Entity context tracking
+  activeCustomerId?: string
+  activeCustomerName?: string
+  pendingConfirmation?: {
+    proposalKind: string
+    customerId?: string
+    amount?: number
+    createdAt: string
+  }
+  dateContext?: string // ISO date for "today", "yesterday", etc.
+  lastReportType?: string // 'daily' | 'weekly' | 'monthly'
 }
 
 export type AIRequest = {

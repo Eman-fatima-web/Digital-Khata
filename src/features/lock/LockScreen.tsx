@@ -3,15 +3,13 @@ import { BookOpen } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
 import { useTranslation } from '../../core/i18n'
-import { verifyPin } from '../../security/pin'
+import { getCooldownRemainingMs, verifyPin } from '../../security/pin'
 import { PinPad } from '../../components/ui/PinPad'
-
-const MAX_ATTEMPTS = 5
-const COOLDOWN_SECONDS = 30
 
 /**
  * Full-screen local app lock. This gate protects the local UI only — it is
  * NOT cloud authentication and never establishes a user identity for sync.
+ * Rate limiting is enforced by the security layer (pin.ts), not here.
  */
 export function LockScreen() {
   const { t } = useTranslation()
@@ -20,16 +18,21 @@ export function LockScreen() {
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [failedCount, setFailedCount] = useState(0)
   const [cooldown, setCooldown] = useState(0)
 
+  const isInCooldown = cooldown > 0
+
   useEffect(() => {
-    if (cooldown <= 0) return
+    if (!isInCooldown) return
     const timer = setInterval(() => {
-      setCooldown((prev) => Math.max(0, prev - 1))
+      const remaining = getCooldownRemainingMs()
+      setCooldown(Math.ceil(remaining / 1000))
+      if (remaining <= 0) {
+        setCooldown(0)
+      }
     }, 1000)
     return () => clearInterval(timer)
-  }, [cooldown])
+  }, [isInCooldown])
 
   const handleComplete = async (pin: string) => {
     if (verifying || cooldown > 0) return
@@ -43,15 +46,13 @@ export function LockScreen() {
     }
 
     setVerifying(false)
-    const nextCount = failedCount + 1
-    setFailedCount(nextCount)
-    setAttempt((prev) => prev + 1)
-    setError(nextCount >= MAX_ATTEMPTS ? null : t('lock.incorrect'))
-    if (nextCount >= MAX_ATTEMPTS) {
-      setCooldown(COOLDOWN_SECONDS)
-      // Attempts are blocked while the cooldown runs, so resetting now gives
-      // a fresh round of attempts once it expires.
-      setFailedCount(0)
+    const remaining = getCooldownRemainingMs()
+    if (remaining > 0) {
+      setCooldown(Math.ceil(remaining / 1000))
+      setError(null)
+    } else {
+      setAttempt((prev) => prev + 1)
+      setError(t('lock.incorrect'))
     }
   }
 

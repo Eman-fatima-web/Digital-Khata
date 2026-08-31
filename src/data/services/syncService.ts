@@ -20,11 +20,13 @@ import { saveSyncConflict } from '../repositories/syncConflictRepo'
 import { getLastSyncAt, networkService, setLastSyncAt } from './networkService'
 
 const RETRY_DELAYS = [1000, 2000, 5000, 10000, 30000]
+const MAX_RETRY_ATTEMPTS = 20
 
 class SyncService {
   private provider: CloudProvider = restCloudProvider
   private syncState: 'idle' | 'syncing' | 'error' = 'idle'
   private listeners = new Set<(state: typeof this.syncState) => void>()
+  private syncPromise: Promise<boolean> | null = null
 
   constructor() {
     networkService.subscribe((online) => {
@@ -67,8 +69,18 @@ class SyncService {
       return false
     }
 
-    if (this.syncState === 'syncing') return false
+    // Promise-based concurrency guard: if a sync is already in progress, return its promise
+    if (this.syncPromise) return this.syncPromise
 
+    this.syncPromise = this.doSync()
+    try {
+      return await this.syncPromise
+    } finally {
+      this.syncPromise = null
+    }
+  }
+
+  private async doSync(): Promise<boolean> {
     this.setState('syncing')
 
     try {
@@ -110,7 +122,12 @@ class SyncService {
     }
 
     for (const action of actions) {
-      if (conflictKeys.has(`${action.table}:${action.recordId}`)) continue
+      // Conflicting actions are resolved via the conflict review flow —
+      // remove them from the queue so they don't retry forever.
+      if (conflictKeys.has(`${action.table}:${action.recordId}`)) {
+        await markActionSucceeded(action.id)
+        continue
+      }
       await this.markRecordSynced(action.table, action.recordId)
       await markActionSucceeded(action.id)
     }
@@ -122,10 +139,17 @@ class SyncService {
   ): Promise<void> {
     let minAttempts = Infinity
     for (const action of actions) {
+      // Permanently failed actions are excluded from future sync attempts
+      if (action.attempts >= MAX_RETRY_ATTEMPTS) {
+        await markActionSucceeded(action.id)
+        continue
+      }
       const attempts = action.attempts + 1
       minAttempts = Math.min(minAttempts, attempts)
       await markActionFailed(action.id, error ?? 'Sync failed')
     }
+
+    if (minAttempts === Infinity) return
 
     const delay = RETRY_DELAYS[Math.min(minAttempts, RETRY_DELAYS.length - 1)]
     setTimeout(() => {

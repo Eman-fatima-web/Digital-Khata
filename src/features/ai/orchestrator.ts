@@ -1,10 +1,10 @@
 import type { AILanguage, AIResult, ConversationContext, KhataSnapshot } from './types'
 import { runEngine } from './engine'
-import { detectPronoun } from './nlp'
+import { detectPronoun, splitCompoundInput } from './nlp'
 import { askAI } from './adapters'
 
 export function createEmptyContext(): ConversationContext {
-  return { turns: [] }
+  return { turns: [], dateContext: new Date().toISOString().split('T')[0] }
 }
 
 export async function processInput(
@@ -14,17 +14,41 @@ export async function processInput(
   language: AILanguage,
   isOnline: boolean,
 ): Promise<{ result: AIResult; updatedContext: ConversationContext }> {
-  // Pronoun resolution: if the input contains pronouns and we have a last customer,
+  // Pronoun resolution: if the input contains pronouns and we have an active customer,
   // inject the customer name so the engine can match it
   let resolvedCustomerName: string | undefined
-  if (detectPronoun(input) && context.lastCustomerName) {
-    resolvedCustomerName = context.lastCustomerName
+  if (detectPronoun(input) && (context.activeCustomerName ?? context.lastCustomerName)) {
+    resolvedCustomerName = context.activeCustomerName ?? context.lastCustomerName
   }
 
   // Run the local engine first with pronoun resolution
   let result = runEngine(input, data, language, resolvedCustomerName)
 
-  // If the local engine returns fallback, try cloud AI
+  // Compound intent splitting: if the engine returns UNKNOWN, try splitting
+  // the input on conjunctions and process each part independently
+  if (result.type === 'fallback') {
+    const parts = splitCompoundInput(input)
+    if (parts.length > 1) {
+      const subResults: AIResult[] = []
+      for (const part of parts) {
+        const subResult = runEngine(part, data, language, resolvedCustomerName)
+        if (subResult.type !== 'fallback') subResults.push(subResult)
+      }
+      if (subResults.length >= 2) {
+        const first = subResults[0]
+        if (first.type !== 'fallback') {
+          const secondaryText = language === 'ur'
+            ? '\n\nبراہ کرم دوسرا عمل الگ سے کہیں۔'
+            : '\n\nPlease ask the second action separately.'
+          result = { ...first, text: first.text + secondaryText }
+        }
+      } else if (subResults.length === 1) {
+        result = subResults[0]
+      }
+    }
+  }
+
+  // If still fallback, try cloud AI
   if (result.type === 'fallback') {
     result = await askAI(
       { input, data, language, context },
@@ -36,6 +60,11 @@ export async function processInput(
   const updatedContext = updateContext(context, input, result, data)
 
   return { result, updatedContext }
+}
+
+/** Clear pending confirmation (called after confirm/cancel) */
+export function clearPendingConfirmation(context: ConversationContext): ConversationContext {
+  return { ...context, pendingConfirmation: undefined }
 }
 
 function updateContext(
@@ -70,24 +99,44 @@ function updateContext(
   let lastCustomerName = context.lastCustomerName
   let lastAmount = context.lastAmount
   const lastIntent = context.lastIntent
+  let activeCustomerId = context.activeCustomerId
+  let activeCustomerName = context.activeCustomerName
+  let pendingConfirmation = context.pendingConfirmation
+  let lastReportType = context.lastReportType
 
   // If the result has a proposal with a customer, update context
   if (result.type === 'proposal' && result.proposal.customerId) {
     lastCustomerId = result.proposal.customerId
     lastCustomerName = result.proposal.customerName
     lastAmount = result.proposal.amount
+    // Set active customer for follow-up references
+    activeCustomerId = result.proposal.customerId
+    activeCustomerName = result.proposal.customerName
+    // Track pending confirmation for security
+    pendingConfirmation = {
+      proposalKind: result.proposal.kind,
+      customerId: result.proposal.customerId,
+      amount: result.proposal.amount,
+      createdAt: now,
+    }
   }
 
-  // If the result mentions a customer in the text, try to extract it
+  // If the result mentions a customer in the text, update active customer
   if (result.type === 'answer') {
-    // Check if any customer name appears in the response
     for (const customer of data.customers) {
       if (result.text.includes(customer.name)) {
         lastCustomerId = customer.id
         lastCustomerName = customer.name
+        activeCustomerId = customer.id
+        activeCustomerName = customer.name
         break
       }
     }
+  }
+
+  // Track report type from intent
+  if (lastIntent === 'SALES_SUMMARY' || lastIntent === 'WEEKLY_SALES' || lastIntent === 'MONTHLY_SALES') {
+    lastReportType = lastIntent === 'WEEKLY_SALES' ? 'weekly' : lastIntent === 'MONTHLY_SALES' ? 'monthly' : 'daily'
   }
 
   return {
@@ -96,5 +145,10 @@ function updateContext(
     lastCustomerName,
     lastAmount,
     lastIntent,
+    activeCustomerId,
+    activeCustomerName,
+    pendingConfirmation,
+    dateContext: context.dateContext ?? now.split('T')[0],
+    lastReportType,
   }
 }
