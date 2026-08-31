@@ -138,9 +138,12 @@ function Dashboard() {
 
   const [aiInput, setAiInput] = useState('')
 
-  const aiPrompts = language === 'ur'
-    ? ['آج کا حساب بتاؤ', 'احمد کا بیلنس', 'نیا گاہک شامل کرو', 'کس کا ادھار اوورڈو ہے؟']
-    : ['Aaj ka hisaab batao', 'Ahmed ka balance', 'New customer add karo', 'Kis ka udhaar overdue hai?']
+  const aiPrompts = [
+    t('dashboard.aiPrompts.dailySummary'),
+    t('dashboard.aiPrompts.customerBalance'),
+    t('dashboard.aiPrompts.addCustomer'),
+    t('dashboard.aiPrompts.overdueReport'),
+  ]
 
   const handleAiSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,6 +155,13 @@ function Dashboard() {
     navigate('/ai', { state: { initialQuery: prompt } })
   }
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return t('dashboard.greetingMorning')
+    if (hour < 17) return t('dashboard.greetingAfternoon')
+    return t('dashboard.greetingEvening')
+  }, [t])
+
   if (isLoading) {
     return <PageLoader />
   }
@@ -159,7 +169,7 @@ function Dashboard() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <section>
-        <p className="text-sm font-semibold text-success-500">{t('dashboard.overview')}</p>
+        <p className="text-sm font-semibold text-success-500">{greeting}</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {t('dashboard.title')}
         </h1>
@@ -169,26 +179,28 @@ function Dashboard() {
       </section>
 
       {/* AI Hero Section */}
-      <section className="rounded-2xl border border-surface-hairline bg-gradient-to-br from-primary-50 to-surface-card p-5 shadow-sm sm:p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
-            <Brain size={20} />
+      <section className="relative overflow-hidden rounded-2xl border border-primary-500/10 bg-gradient-to-br from-primary-50 via-surface-card to-success-50/40 p-5 shadow-sm sm:p-6">
+        <div className="absolute -end-8 -top-8 h-32 w-32 rounded-full bg-primary-500/5 blur-2xl" />
+        <div className="absolute -bottom-6 -start-6 h-24 w-24 rounded-full bg-success-500/5 blur-2xl" />
+        <div className="relative flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-md shadow-primary-500/20">
+            <Brain size={22} />
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold text-ink sm:text-lg">
-              {language === 'ur' ? 'آج میں آپ کی کیا مدد کر سکتا ہوں؟' : 'How can I help you today?'}
+              {t('dashboard.aiHeroTitle')}
             </h2>
             <form onSubmit={handleAiSubmit} className="mt-3 flex items-center gap-2">
               <input
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
-                placeholder={language === 'ur' ? 'سوال پوچھیں یا حکم دیں...' : 'Ask a question or give a command...'}
+                placeholder={t('dashboard.aiHeroPlaceholder')}
                 className="min-w-0 flex-1 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
               />
               <button
                 type="submit"
                 disabled={!aiInput.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white shadow-sm transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Send size={16} />
               </button>
@@ -199,7 +211,7 @@ function Dashboard() {
                   key={prompt}
                   type="button"
                   onClick={() => handlePromptClick(prompt)}
-                  className="rounded-full border border-surface-hairline bg-surface-card px-3 py-1.5 text-xs font-medium text-ink-muted transition hover:border-primary-300 hover:text-primary-600"
+                  className="rounded-full border border-surface-hairline/80 bg-surface-card/80 px-3 py-1.5 text-xs font-medium text-ink-muted backdrop-blur-sm transition hover:border-primary-300 hover:text-primary-600"
                 >
                   {prompt}
                 </button>
@@ -211,19 +223,21 @@ function Dashboard() {
 
       {/* Proactive Insights */}
       {proactiveInsights.length > 0 && (
-        <section className="space-y-2">
+        <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <Bell size={16} className="text-primary-500" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-50">
+              <Bell size={13} className="text-primary-500" />
+            </div>
             <h3 className="text-sm font-semibold text-ink">
-              {language === 'ur' ? 'آج کے جائزے' : 'Today at a glance'}
+              {t('dashboard.insightsTitle')}
             </h3>
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {proactiveInsights.slice(0, 4).map((insight) => (
               <div
                 key={insight.id}
                 className={cn(
-                  'flex items-start gap-3 rounded-xl border p-3 text-sm',
+                  'flex items-start gap-3 rounded-xl border p-3.5 text-sm transition hover:shadow-sm',
                   insight.severity === 'warning' && 'border-warning/20 bg-warning/5',
                   insight.severity === 'success' && 'border-success-200 bg-success-50',
                   insight.severity === 'info' && 'border-surface-hairline bg-surface-card',
@@ -231,7 +245,7 @@ function Dashboard() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-ink">{insight.title}</p>
-                  <p className="text-xs text-ink-muted">{insight.description}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">{insight.description}</p>
                 </div>
               </div>
             ))}
@@ -239,7 +253,7 @@ function Dashboard() {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
         <StatCard
           label={t('dashboard.totalUdhaar')}
           value={stats.totalReceivable}
@@ -271,20 +285,22 @@ function Dashboard() {
       {overdueCount > 0 && (
         <button
           onClick={() => navigate('/reports')}
-          className="flex w-full items-center gap-3 rounded-2xl border border-warning/20 bg-warning/10 px-5 py-4 text-left transition hover:bg-warning/15"
+          className="group flex w-full items-center gap-3 rounded-2xl border border-warning/20 bg-warning/5 px-5 py-4 text-left transition hover:bg-warning/10"
         >
-          <Clock size={20} className="text-warning" />
-          <div className="flex-1">
-            <p className="font-semibold text-ink">{overdueCount} overdue payment{overdueCount > 1 ? 's' : ''}</p>
-            <p className="text-sm text-ink-muted">Review customers with overdue udhaar.</p>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/10">
+            <Clock size={20} className="text-warning" />
           </div>
-          <ChevronRight size={18} className="text-ink-muted" />
+          <div className="flex-1">
+            <p className="font-semibold text-ink">{t('dashboard.overdueBannerTitle', { count: overdueCount })}</p>
+            <p className="text-sm text-ink-muted">{t('dashboard.overdueBannerDescription')}</p>
+          </div>
+          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
         </button>
       )}
 
       <button
         onClick={() => navigate('/ai')}
-        className="group flex w-full flex-col gap-3 rounded-2xl border border-primary-500/20 bg-gradient-to-br from-surface-card to-primary-50/60 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center"
+        className="group flex w-full flex-col gap-3 rounded-2xl border border-primary-500/15 bg-gradient-to-br from-surface-card via-primary-50/30 to-success-50/20 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center"
       >
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
@@ -295,7 +311,7 @@ function Dashboard() {
         <div className="min-w-0 flex-1 space-y-1">
           {insightLines.map((line) => (
             <p key={line} className="truncate text-xs text-ink-muted sm:text-sm">
-              • {line}
+              {line}
             </p>
           ))}
         </div>
@@ -305,47 +321,47 @@ function Dashboard() {
         </span>
       </button>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <button
           onClick={() => navigate('/udhaar?add=true')}
-          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-gradient-to-br from-surface-card to-success-50 p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-gradient-to-br from-surface-card to-success-50/50 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-success-500 text-white shadow-sm">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-success-500 text-white shadow-sm shadow-success-500/20">
             <Plus size={22} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold text-ink">{t('udhaar.addUdhaar')}</span>
-            <span className="mt-1 block text-xs text-ink-muted">Record a new credit entry</span>
+            <span className="mt-0.5 block text-xs text-ink-muted">{t('dashboard.quickActionUdhaarSubtitle')}</span>
           </span>
-          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-1" />
+          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
         </button>
 
         <button
           onClick={() => navigate('/customers?add=true')}
-          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-surface-card p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-gradient-to-br from-surface-card to-info/5 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-info/10 text-info">
             <Users size={22} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold text-ink">{t('customers.addCustomer')}</span>
-            <span className="mt-1 block text-xs text-ink-muted">Create a new customer profile</span>
+            <span className="mt-0.5 block text-xs text-ink-muted">{t('dashboard.quickActionCustomerSubtitle')}</span>
           </span>
-          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-1" />
+          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
         </button>
 
         <button
           onClick={() => navigate('/payments?add=true')}
-          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-surface-card p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+          className="group flex items-center gap-4 rounded-2xl border border-surface-hairline bg-gradient-to-br from-surface-card to-warning/5 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning">
             <ArrowDownLeft size={22} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-semibold text-ink">{t('payments.recordPayment')}</span>
-            <span className="mt-1 block text-xs text-ink-muted">Record a customer payment</span>
+            <span className="mt-0.5 block text-xs text-ink-muted">{t('dashboard.quickActionPaymentSubtitle')}</span>
           </span>
-          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-1" />
+          <ChevronRight size={18} className="text-ink-muted transition-transform group-hover:translate-x-0.5" />
         </button>
       </section>
 
@@ -353,11 +369,11 @@ function Dashboard() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>{t('dashboard.recentActivity')}</CardTitle>
-            <p className="mt-1 text-xs text-ink-muted sm:text-sm">Latest transactions across your khata.</p>
+            <p className="mt-1 text-xs text-ink-muted sm:text-sm">{t('dashboard.recentActivitySubtitle')}</p>
           </div>
           <button
             onClick={() => navigate('/reports')}
-            className="hidden items-center gap-1 text-sm font-semibold text-success-500 transition hover:text-success-600 sm:flex"
+            className="hidden items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-success-500 transition hover:bg-success-50 hover:text-success-600 sm:flex"
           >
             {t('dashboard.viewAll')}
             <ChevronRight size={16} />
@@ -368,7 +384,7 @@ function Dashboard() {
             <EmptyState
               icon={Receipt}
               title={t('dashboard.noTransactions')}
-              description="Add your first transaction to start managing your khata."
+              description={t('dashboard.noTransactionsDescription')}
               action={
                 <button
                   onClick={() => navigate('/udhaar?add=true')}
@@ -385,7 +401,7 @@ function Dashboard() {
                 <button
                   key={item.id}
                   onClick={() => item.customerId && navigate(`/customers/${item.customerId}`)}
-                  className="flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-surface sm:px-6"
+                  className="flex w-full items-center gap-4 px-5 py-3.5 text-left transition hover:bg-surface-hover sm:px-6"
                 >
                   <div className={`
                     flex h-10 w-10 shrink-0 items-center justify-center rounded-full
@@ -399,10 +415,10 @@ function Dashboard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-ink">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-ink-muted">{item.subtitle} • {formatDate(item.date)}</p>
+                    <p className="mt-0.5 text-xs text-ink-muted">{item.subtitle} · {formatDate(item.date)}</p>
                   </div>
                   <p className={`
-                    font-semibold tabular-nums
+                    shrink-0 font-semibold tabular-nums
                     ${item.type === 'payment' ? 'text-success-500' : 'text-ink'}
                   `}>
                     {item.type === 'payment' ? '+' : ''}{formatCurrency(item.amount)}

@@ -75,6 +75,7 @@ export type User = {
   email?: string
   name: string
   phone?: string
+  emailVerified?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -113,6 +114,10 @@ export type ActionKind =
   | 'DELETE_UDHAAR'
   | 'DELETE_PAYMENT'
   | 'DELETE_SALE'
+  | 'RESTORE_CUSTOMER'
+  | 'RESTORE_UDHAAR'
+  | 'RESTORE_PAYMENT'
+  | 'RESTORE_SALE'
   | 'UPDATE_CUSTOMER'
   | 'UPDATE_UDHAAR'
   | 'UPDATE_PAYMENT'
@@ -155,9 +160,24 @@ export type AIMessage = {
   id: string
   userId: string
   shopId: string
+  conversationId?: string
   role: 'user' | 'ai'
   content: string
   createdAt: string
   action?: ActionProposal
   actionState?: 'pending' | 'executing' | 'confirmed' | 'cancelled'
+}
+
+export type Conversation = {
+  id: string
+  userId: string
+  shopId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NotificationPreferences = {
+  dailySalesSummary: boolean
+  paymentReminders: boolean
 }

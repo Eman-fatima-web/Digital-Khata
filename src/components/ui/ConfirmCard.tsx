@@ -42,7 +42,7 @@ export function ConfirmCard({
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-4 text-sm">
             <span className="shrink-0 text-ink-muted">{row.label}</span>
-            <span className="text-end font-semibold text-ink">{row.value}</span>
+            <span className="min-w-0 truncate text-end font-semibold text-ink">{row.value}</span>
           </div>
         ))}
 

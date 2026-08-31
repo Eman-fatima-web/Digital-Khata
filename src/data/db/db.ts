@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie'
 
 import type {
   AIMessage,
+  Conversation,
   Customer,
   Payment,
   Sale,
@@ -18,6 +19,7 @@ export class KhataDB extends Dexie {
   syncQueue!: Table<SyncAction, string>
   syncConflicts!: Table<SyncConflictRecord, string>
   aiMessages!: Table<AIMessage, string>
+  conversations!: Table<Conversation, string>
 
   constructor() {
     super('digital-khata')
@@ -67,6 +69,45 @@ export class KhataDB extends Dexie {
       syncConflicts: 'id, table, recordId, createdAt',
       aiMessages: 'id, userId, shopId, [userId+shopId], createdAt',
     })
+
+    // Version 6: Conversations support for AI chat history
+    this.version(6)
+      .stores({
+        conversations: 'id, userId, shopId, [userId+shopId], updatedAt',
+        aiMessages: 'id, userId, shopId, [userId+shopId], conversationId, createdAt',
+      })
+      .upgrade((tx) => {
+        return tx.table('aiMessages').toArray().then((msgs) => {
+          const groups = new Map<string, string[]>()
+          msgs.forEach((m: AIMessage) => {
+            const key = `${m.userId}__${m.shopId}`
+            if (!groups.has(key)) groups.set(key, [])
+            groups.get(key)!.push(m.id)
+          })
+          const promises: Promise<unknown>[] = []
+          groups.forEach((msgIds, key) => {
+            const [userId, shopId] = key.split('__')
+            const convId = crypto.randomUUID()
+            const now = new Date().toISOString()
+            promises.push(
+              tx.table('conversations').add({
+                id: convId,
+                userId,
+                shopId,
+                title: 'Previous Chat',
+                createdAt: now,
+                updatedAt: now,
+              } as Conversation)
+            )
+            msgIds.forEach((mid) => {
+              promises.push(
+                tx.table('aiMessages').update(mid, { conversationId: convId })
+              )
+            })
+          })
+          return Promise.all(promises)
+        })
+      })
   }
 }
 

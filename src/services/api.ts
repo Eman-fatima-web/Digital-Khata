@@ -11,6 +11,7 @@ type AuthTokens = {
     id: string
     businessId: string
     email: string
+    emailVerified?: boolean
   }
 }
 
@@ -219,6 +220,26 @@ export async function getOverdueCustomers(): Promise<{
   customers: Array<{ id: string; name: string; phone?: string; overdueAmount: number; overdueCount: number }>
 }> {
   return authenticatedRequest('/api/reminders/overdue')
+}
+
+/**
+ * Verify email address using token from email link
+ */
+export async function verifyEmail(
+  token: string,
+  userId: string
+): Promise<{ verified: boolean; error?: string }> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}&id=${encodeURIComponent(userId)}`
+  )
+  return response.json()
+}
+
+/**
+ * Send verification email to the authenticated user
+ */
+export async function sendVerification(): Promise<{ sent: boolean }> {
+  return authenticatedRequest('/api/auth/send-verification', { method: 'POST' })
 }
 
 /**

@@ -1,6 +1,8 @@
 import { Pool } from 'pg'
 import { logger } from '../services/logger.js'
 
+const hasConnectionString = Boolean(process.env.DATABASE_URL)
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,
@@ -11,6 +13,20 @@ const pool = new Pool({
 pool.on('error', (err) => {
   logger.error({ err }, 'Unexpected database error')
 })
+
+let dbAvailable: boolean | null = hasConnectionString ? null : false
+
+export async function isDatabaseAvailable(): Promise<boolean> {
+  if (!hasConnectionString) return false
+  if (dbAvailable !== null) return dbAvailable
+  try {
+    await pool.query('SELECT 1')
+    dbAvailable = true
+  } catch {
+    dbAvailable = false
+  }
+  return dbAvailable
+}
 
 export async function query(text: string, params?: unknown[]) {
   const start = Date.now()

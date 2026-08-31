@@ -40,4 +40,7 @@ export const STORAGE_KEYS = {
   USER: 'dk-user',
   SHOP: 'dk-shop',
   REMINDER_NOTIFIED_DATE: 'dk-reminder-notified-date',
+  NOTIFICATION_PREFS: 'dk-notification-preferences',
+  DAILY_SUMMARY_NOTIFIED_DATE: 'dk-daily-summary-notified-date',
+  AI_PROVIDER: 'dk-ai-provider',
 } as const

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShieldCheck,
@@ -11,12 +11,21 @@ import {
   WifiOff,
   LogOut,
   Cloud,
+  Bell,
+  Database,
+  CheckCircle,
+  AlertCircle,
+  Cpu,
 } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
 import { useAuth } from '../../context/AuthProvider'
+import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
+import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
+import { useAIProvider, fetchOllamaHealth, type OllamaHealthStatus } from '../../hooks/useAIProvider'
 import { clearPin, setPin, verifyPin } from '../../security/pin'
+import { clearAllConversations } from '../../data/repositories/conversationRepo'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
@@ -26,11 +35,36 @@ import { useToast } from '../../components/ui/Toast'
 
 type PinFlow = null | 'create' | 'change-current' | 'change-new' | 'change-confirm' | 'remove-current'
 
+function SectionHeader({ children }: { children: string }) {
+  return (
+    <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+      {children}
+    </h2>
+  )
+}
+
 function Settings() {
-  const { t, language } = useTranslation()
+  const { t } = useTranslation()
   const { pinEnabled, setPinEnabled, lock, theme, toggleTheme } = useApp()
-  const { isAuthenticated, user, logout } = useAuth()
+  const { isAuthenticated, user, logout, sendVerification } = useAuth()
+  const owner = useOwner()
+  const { prefs, updatePrefs } = useNotificationPreferences()
+  const { provider: aiProvider, setProvider: setAIProvider } = useAIProvider()
+  const [ollamaHealth, setOllamaHealth] = useState<OllamaHealthStatus | null>(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (aiProvider !== 'ollama') return
+
+    let cancelled = false
+    const check = async () => {
+      setOllamaHealth({ status: 'checking' })
+      const result = await fetchOllamaHealth()
+      if (!cancelled) setOllamaHealth(result)
+    }
+    check()
+    return () => { cancelled = true }
+  }, [aiProvider])
 
   const [flow, setFlow] = useState<PinFlow>(null)
   const [origin, setOrigin] = useState<'create' | 'change'>('create')
@@ -152,6 +186,21 @@ function Settings() {
     }
   }
 
+  const handleClearHistory = async () => {
+    if (!window.confirm(t('settings.clearHistoryConfirm'))) return
+    await clearAllConversations(owner.userId, owner.shopId)
+    showToast('success', t('settings.historyCleared'))
+  }
+
+  const handleSendVerification = async () => {
+    try {
+      await sendVerification()
+      showToast('success', t('auth.verifyEmail.resendSuccess'))
+    } catch {
+      showToast('error', t('common.error'))
+    }
+  }
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <section>
@@ -164,162 +213,371 @@ function Settings() {
         </p>
       </section>
 
-      <Card>
-        <CardHeader className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <CardTitle>{t('settings.appLock')}</CardTitle>
-            <p className="mt-0.5 text-xs text-ink-muted">{t('settings.appLockDesc')}</p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {pinEnabled ? (
-              <>
-                <Button variant="outline" size="sm" onClick={() => { setOrigin('change'); setFlow('change-current') }}>
-                  <LockKeyhole size={15} />
-                  {t('settings.changePin')}
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => { setOrigin('change'); setFlow('remove-current') }}>
-                  <Trash2 size={15} />
-                  {t('settings.removePin')}
-                </Button>
-                <Button variant="primary" size="sm" onClick={lock}>
+      {/* Security Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.securitySection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.appLock')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.appLockDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {pinEnabled ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => { setOrigin('change'); setFlow('change-current') }}>
+                    <LockKeyhole size={15} />
+                    {t('settings.changePin')}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => { setOrigin('change'); setFlow('remove-current') }}>
+                    <Trash2 size={15} />
+                    {t('settings.removePin')}
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={lock}>
+                    <Lock size={15} />
+                    {t('settings.lockNow')}
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" onClick={() => { setOrigin('create'); setFlow('create') }}>
                   <Lock size={15} />
-                  {t('settings.lockNow')}
+                  {t('settings.createPin')}
                 </Button>
-              </>
-            ) : (
-              <Button size="sm" onClick={() => { setOrigin('create'); setFlow('create') }}>
-                <Lock size={15} />
-                {t('settings.createPin')}
-              </Button>
-            )}
-          </div>
-          <p className="mt-4 flex items-start gap-2 rounded-xl bg-surface p-3 text-xs leading-5 text-ink-muted">
-            <Info size={14} className="mt-0.5 shrink-0 text-info" />
-            {t('settings.localSecurityDesc')}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-100 text-accent-600">
-            <Palette size={20} />
-          </div>
-          <div>
-            <CardTitle>{t('settings.appearance')}</CardTitle>
-            <p className="mt-0.5 text-xs text-ink-muted">{t('settings.appearanceDesc')}</p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-sm font-semibold text-ink">
-              {theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
+              )}
+            </div>
+            <p className="mt-4 flex items-start gap-2 rounded-xl bg-surface p-3 text-xs leading-5 text-ink-muted">
+              <Info size={14} className="mt-0.5 shrink-0 text-info" />
+              {t('settings.localSecurityDesc')}
             </p>
-            <button
-              role="switch"
-              aria-checked={theme === 'dark'}
-              onClick={toggleTheme}
-              className={`relative h-7 w-12 rounded-full transition ${
-                theme === 'dark' ? 'bg-primary-500' : 'bg-ink-subtle/40'
-              }`}
-            >
-              <span
-                className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                  theme === 'dark' ? 'start-6' : 'start-1'
-                }`}
-              />
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </section>
 
-      <Card>
-        <CardHeader className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10 text-info">
-            <Languages size={20} />
-          </div>
-          <div>
-            <CardTitle>{t('settings.language')}</CardTitle>
-            <p className="mt-0.5 text-xs text-ink-muted">{t('settings.languageDesc')}</p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <LanguageSwitcher />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
-            <Cloud size={20} />
-          </div>
-          <div>
-            <CardTitle>Cloud Account</CardTitle>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              {isAuthenticated ? 'Sync your data across devices' : 'Login to enable cloud sync'}
-            </p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isAuthenticated ? (
+      {/* Appearance Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.appearanceSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-100 text-accent-600">
+              <Palette size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.appearance')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.appearanceDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
             <div className="flex items-center justify-between gap-4">
-              <div className="text-sm">
-                <p className="font-semibold text-ink">{user?.email}</p>
-                <p className="text-xs text-ink-muted">Connected</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  logout()
-                  navigate('/login')
-                }}
+              <p className="text-sm font-semibold text-ink">
+                {theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
+              </p>
+              <button
+                role="switch"
+                aria-checked={theme === 'dark'}
+                onClick={toggleTheme}
+                className={`relative h-7 w-12 rounded-full transition ${
+                  theme === 'dark' ? 'bg-primary-500' : 'bg-ink-subtle/40'
+                }`}
               >
-                <LogOut size={15} />
-                Logout
-              </Button>
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                    theme === 'dark' ? 'start-6' : 'start-1'
+                  }`}
+                />
+              </button>
             </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => navigate('/login')}>
-                Login
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
-                Create Account
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 text-success-500">
-            <Info size={20} />
-          </div>
-          <div>
-            <CardTitle>{t('app.name')}</CardTitle>
-            <p className="mt-0.5 text-xs text-ink-muted">{t('settings.offlineFirst')}</p>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-2 text-sm text-ink-muted">
-            <div className="flex items-center justify-between">
-              <span>{t('settings.version')}</span>
-              <span className="font-semibold text-ink">1.0.0</span>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-info/10 text-info">
+              <Languages size={20} />
             </div>
-            <div className="flex items-center gap-2">
-              <WifiOff size={14} className="shrink-0 text-success-500" />
-              <span>{language === 'ur' ? 'آف لائن فرسٹ ڈیٹا' : 'Offline-first data storage'}</span>
+            <div>
+              <CardTitle>{t('settings.language')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.languageDesc')}</p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <LanguageSwitcher />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Notifications Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.notificationsSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10 text-warning">
+              <Bell size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.notifications')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.notificationsDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-ink">{t('settings.dailySalesSummary')}</p>
+                <p className="text-xs text-ink-muted">{t('settings.dailySalesSummaryDesc')}</p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={prefs.dailySalesSummary}
+                onClick={() => updatePrefs({ dailySalesSummary: !prefs.dailySalesSummary })}
+                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                  prefs.dailySalesSummary ? 'bg-primary-500' : 'bg-ink-subtle/40'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                    prefs.dailySalesSummary ? 'start-6' : 'start-1'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-ink">{t('settings.paymentReminders')}</p>
+                <p className="text-xs text-ink-muted">{t('settings.paymentRemindersDesc')}</p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={prefs.paymentReminders}
+                onClick={() => updatePrefs({ paymentReminders: !prefs.paymentReminders })}
+                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                  prefs.paymentReminders ? 'bg-primary-500' : 'bg-ink-subtle/40'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                    prefs.paymentReminders ? 'start-6' : 'start-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* AI Provider Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.aiProviderSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+              <Cpu size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.aiProvider')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.aiProviderDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {([
+              { value: 'auto' as const, label: t('settings.aiProviderAuto'), desc: t('settings.aiProviderAutoDesc') },
+              { value: 'ollama' as const, label: t('settings.aiProviderOllama'), desc: t('settings.aiProviderOllamaDesc') },
+              { value: 'openrouter' as const, label: t('settings.aiProviderOpenRouter'), desc: t('settings.aiProviderOpenRouterDesc') },
+            ]).map((option) => (
+              <button
+                key={option.value}
+                onClick={() => {
+                  setAIProvider(option.value)
+                  showToast('success', t('settings.aiProviderSaved'))
+                }}
+                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-start transition ${
+                  aiProvider === option.value
+                    ? 'border-primary-500 bg-primary-500/5'
+                    : 'border-surface-border hover:border-ink-subtle/30'
+                }`}
+              >
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                    aiProvider === option.value ? 'border-primary-500' : 'border-ink-subtle/40'
+                  }`}
+                >
+                  {aiProvider === option.value && (
+                    <span className="h-2.5 w-2.5 rounded-full bg-primary-500" />
+                  )}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-ink">{option.label}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">{option.desc}</p>
+                </div>
+              </button>
+            ))}
+
+            {aiProvider === 'ollama' && ollamaHealth && (
+              <div className="mt-2 rounded-xl bg-surface p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-ink">{t('settings.ollamaStatus')}:</span>
+                  {ollamaHealth.status === 'checking' && (
+                    <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-info" />
+                      {t('settings.ollamaChecking')}
+                    </span>
+                  )}
+                  {ollamaHealth.status === 'connected' && (
+                    <span className="flex items-center gap-1.5 text-xs text-success-500">
+                      <CheckCircle size={14} />
+                      {t('settings.ollamaConnected')}
+                    </span>
+                  )}
+                  {(ollamaHealth.status === 'disconnected' || ollamaHealth.status === 'error') && (
+                    <span className="flex items-center gap-1.5 text-xs text-danger">
+                      <AlertCircle size={14} />
+                      {t('settings.ollamaDisconnected')}
+                    </span>
+                  )}
+                </div>
+                {ollamaHealth.status === 'connected' && ollamaHealth.model && (
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    {t('settings.ollamaModel')}: <span className="font-semibold text-ink">{ollamaHealth.model}</span>
+                  </p>
+                )}
+                {ollamaHealth.status === 'connected' && ollamaHealth.models && (
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {t('settings.ollamaModelsAvailable', { count: String(ollamaHealth.models.length) })}
+                  </p>
+                )}
+                {ollamaHealth.status === 'error' && ollamaHealth.error && (
+                  <p className="mt-1.5 text-xs text-danger">{ollamaHealth.error}</p>
+                )}
+                {ollamaHealth.status === 'disconnected' && (
+                  <p className="mt-1.5 text-xs text-ink-muted">{t('settings.ollamaNotRunning')}</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Account Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.accountSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+              <Cloud size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.cloudAccount')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                {isAuthenticated ? t('settings.cloudAccountConnected') : t('settings.cloudAccountDisconnected')}
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isAuthenticated ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="text-sm">
+                    <p className="font-semibold text-ink">{user?.email}</p>
+                    <p className="text-xs text-ink-muted">{t('settings.connected')}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      logout()
+                      navigate('/login')
+                    }}
+                  >
+                    <LogOut size={15} />
+                    {t('settings.logout')}
+                  </Button>
+                </div>
+                {user?.emailVerified ? (
+                  <div className="flex items-center gap-2 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-600">
+                    <CheckCircle size={14} />
+                    {t('settings.emailVerified')}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 rounded-lg bg-warning/10 px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs text-warning">
+                      <AlertCircle size={14} />
+                      {t('settings.emailNotVerified')}
+                    </div>
+                    <button
+                      onClick={handleSendVerification}
+                      className="text-xs font-semibold text-primary-500 hover:underline"
+                    >
+                      {t('settings.verifyEmail')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => navigate('/login')}>
+                  {t('settings.login')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/register')}>
+                  {t('settings.createAccount')}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Data Management Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.dataManagementSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">
+              <Database size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.clearAIHistory')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.clearAIHistoryDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" size="sm" onClick={handleClearHistory}>
+              <Trash2 size={15} />
+              {t('settings.clearHistory')}
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* About Section */}
+      <section className="space-y-3">
+        <SectionHeader>{t('settings.aboutSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 text-success-500">
+              <Info size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('app.name')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.offlineFirst')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2 text-sm text-ink-muted">
+              <div className="flex items-center justify-between">
+                <span>{t('settings.version')}</span>
+                <span className="font-semibold text-ink">1.0.0</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <WifiOff size={14} className="shrink-0 text-success-500" />
+                <span>{t('settings.offlineFirstData')}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
       {flow && (
         <Sheet

@@ -19,6 +19,9 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  verification_token VARCHAR(255),
+  verification_token_expiry TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

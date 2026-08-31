@@ -1,20 +1,22 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { UserPlus, Mail, Loader2 } from 'lucide-react'
 
 import { useAuth } from '../../context/AuthProvider'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 
 export default function Register() {
-  const navigate = useNavigate()
-  const { register, isLoading } = useAuth()
+  const { register, sendVerification, isLoading } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [registered, setRegistered] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -37,10 +39,75 @@ export default function Register() {
 
     try {
       await register(email, password, businessName || undefined)
-      navigate('/dashboard', { replace: true })
+      try {
+        await sendVerification()
+      } catch {
+        // verification email is best-effort
+      }
+      setRegistered(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     }
+  }
+
+  const handleResend = async () => {
+    setResending(true)
+    setResent(false)
+    try {
+      await sendVerification()
+      setResent(true)
+    } catch {
+      // silently fail
+    }
+    setResending(false)
+  }
+
+  if (registered) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Mail className="h-5 w-5" />
+              Check Your Email
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 text-center">
+              <p className="text-ink-muted">
+                We sent a verification link to <strong className="text-ink">{email}</strong>
+              </p>
+              <p className="text-sm text-ink-muted">
+                Check your inbox and click the link to verify your email address.
+              </p>
+
+              <div className="space-y-2 pt-2">
+                <Button
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="w-full"
+                >
+                  {resending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : resent ? (
+                    'Email Sent!'
+                  ) : (
+                    'Resend Verification Email'
+                  )}
+                </Button>
+
+                <Link
+                  to="/login"
+                  className="block text-sm font-medium text-primary-500 hover:text-primary-600"
+                >
+                  Go to Login
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

@@ -181,6 +181,81 @@ export async function deletePayment(businessId: string, id: string): Promise<boo
   }
 }
 
+export async function restorePayment(businessId: string, id: string): Promise<boolean> {
+  const client = await (await import('../database/index.js')).getClient()
+
+  try {
+    await client.query('BEGIN')
+
+    const paymentResult = await client.query(
+      `SELECT * FROM payments WHERE id = $1 AND business_id = $2`,
+      [id, businessId]
+    )
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK')
+      return false
+    }
+
+    const payment = paymentResult.rows[0]
+
+    // Re-apply udhaar amounts if linked
+    if (payment.udhaar_id) {
+      await client.query(
+        `UPDATE udhaar 
+         SET paid_amount = paid_amount + $1, 
+             remaining_amount = GREATEST(remaining_amount - $1, 0),
+             sync_status = 'pending',
+             version = version + 1
+         WHERE id = $2 AND business_id = $3 AND is_deleted = FALSE`,
+        [payment.amount, payment.udhaar_id, businessId]
+      )
+    }
+
+    await client.query(
+      `UPDATE payments SET is_deleted = FALSE, sync_status = 'pending', version = version + 1
+       WHERE id = $1 AND business_id = $2`,
+      [id, businessId]
+    )
+
+    await client.query('COMMIT')
+    return true
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export async function getDeletedPayments(
+  businessId: string,
+  options?: { limit?: number; cursor?: string }
+): Promise<{ payments: Payment[]; nextCursor?: string; hasMore: boolean }> {
+  const limit = options?.limit || 50
+  const cursor = options?.cursor
+
+  let queryText = `SELECT * FROM payments WHERE business_id = $1 AND is_deleted = TRUE`
+  const params: unknown[] = [businessId]
+  let paramIndex = 2
+
+  if (cursor) {
+    queryText += ` AND id < $${paramIndex}`
+    params.push(cursor)
+    paramIndex++
+  }
+
+  queryText += ` ORDER BY updated_at DESC, id DESC LIMIT $${paramIndex}`
+  params.push(limit + 1)
+
+  const result = await query(queryText, params)
+  const hasMore = result.rows.length > limit
+  const payments = result.rows.slice(0, limit).map(mapPaymentRow)
+  const nextCursor = hasMore ? result.rows[limit - 1].id : undefined
+
+  return { payments, nextCursor, hasMore }
+}
+
 function mapPaymentRow(row: Record<string, unknown>): Payment {
   return {
     id: row.id as string,

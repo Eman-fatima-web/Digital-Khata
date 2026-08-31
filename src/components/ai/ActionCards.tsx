@@ -74,7 +74,7 @@ export function TransactionCard({ type, customerName, amount, description, date,
             {method && <p className="mt-0.5 text-xs text-ink-subtle">{method}</p>}
           </div>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <p className="text-sm font-bold text-ink">{formatCurrency(amount)}</p>
           <p className="text-[10px] text-ink-subtle">{formatDate(date)}</p>
         </div>
@@ -126,7 +126,7 @@ export function NavigationCard({ page, description }: NavigationCardProps) {
   return (
     <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-600">
           <span className="text-sm font-bold">{page.charAt(0).toUpperCase()}</span>
         </div>
         <div>

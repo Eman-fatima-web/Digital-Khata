@@ -88,3 +88,105 @@ dataRouter.get('/sales', async (req: AuthenticatedRequest, res) => {
     res.status(500).json({ error: 'Failed to fetch sales' })
   }
 })
+
+// Deleted items endpoints
+dataRouter.get('/deleted/customers', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const { limit, cursor } = parsePagination(req.query as Record<string, unknown>)
+    const result = await customerRepo.getDeletedCustomers(businessId, { limit, cursor })
+    res.json(result)
+  } catch (error) {
+    log.error({ err: error }, 'List deleted customers error')
+    res.status(500).json({ error: 'Failed to fetch deleted customers' })
+  }
+})
+
+dataRouter.get('/deleted/sales', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const { limit, cursor } = parsePagination(req.query as Record<string, unknown>)
+    const result = await saleRepo.getDeletedSales(businessId, { limit, cursor })
+    res.json(result)
+  } catch (error) {
+    log.error({ err: error }, 'List deleted sales error')
+    res.status(500).json({ error: 'Failed to fetch deleted sales' })
+  }
+})
+
+dataRouter.get('/deleted/payments', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const { limit, cursor } = parsePagination(req.query as Record<string, unknown>)
+    const result = await paymentRepo.getDeletedPayments(businessId, { limit, cursor })
+    res.json(result)
+  } catch (error) {
+    log.error({ err: error }, 'List deleted payments error')
+    res.status(500).json({ error: 'Failed to fetch deleted payments' })
+  }
+})
+
+dataRouter.get('/deleted/udhaar', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const { limit, cursor } = parsePagination(req.query as Record<string, unknown>)
+    const result = await udhaarRepo.getDeletedUdhaar(businessId, { limit, cursor })
+    res.json(result)
+  } catch (error) {
+    log.error({ err: error }, 'List deleted udhaar error')
+    res.status(500).json({ error: 'Failed to fetch deleted udhaar entries' })
+  }
+})
+
+// Restore endpoints
+dataRouter.post('/restore/customers/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const restored = await customerRepo.restoreCustomer(businessId, req.params.id)
+    if (!restored) return res.status(404).json({ error: 'Customer not found' })
+    log.info({ customerId: req.params.id }, 'Customer restored')
+    res.json({ success: true })
+  } catch (error) {
+    log.error({ err: error }, 'Restore customer error')
+    res.status(500).json({ error: 'Failed to restore customer' })
+  }
+})
+
+dataRouter.post('/restore/sales/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const restored = await saleRepo.restoreSale(businessId, req.params.id)
+    if (!restored) return res.status(404).json({ error: 'Sale not found' })
+    log.info({ saleId: req.params.id }, 'Sale restored')
+    res.json({ success: true })
+  } catch (error) {
+    log.error({ err: error }, 'Restore sale error')
+    res.status(500).json({ error: 'Failed to restore sale' })
+  }
+})
+
+dataRouter.post('/restore/payments/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const restored = await paymentRepo.restorePayment(businessId, req.params.id)
+    if (!restored) return res.status(404).json({ error: 'Payment not found' })
+    log.info({ paymentId: req.params.id }, 'Payment restored')
+    res.json({ success: true })
+  } catch (error) {
+    log.error({ err: error }, 'Restore payment error')
+    res.status(500).json({ error: 'Failed to restore payment' })
+  }
+})
+
+dataRouter.post('/restore/udhaar/:id', async (req: AuthenticatedRequest, res) => {
+  try {
+    const businessId = req.businessId!
+    const restored = await udhaarRepo.restoreUdhaar(businessId, req.params.id)
+    if (!restored) return res.status(404).json({ error: 'Udhaar entry not found' })
+    log.info({ udhaarId: req.params.id }, 'Udhaar entry restored')
+    res.json({ success: true })
+  } catch (error) {
+    log.error({ err: error }, 'Restore udhaar error')
+    res.status(500).json({ error: 'Failed to restore udhaar entry' })
+  }
+})

@@ -181,6 +181,52 @@ export async function getAllSales(
   return { sales, nextCursor, hasMore }
 }
 
+export async function deleteSale(businessId: string, id: string): Promise<boolean> {
+  const result = await query(
+    `UPDATE sales SET is_deleted = TRUE, sync_status = 'pending', version = version + 1
+     WHERE id = $1 AND business_id = $2`,
+    [id, businessId]
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+export async function restoreSale(businessId: string, id: string): Promise<boolean> {
+  const result = await query(
+    `UPDATE sales SET is_deleted = FALSE, sync_status = 'pending', version = version + 1
+     WHERE id = $1 AND business_id = $2`,
+    [id, businessId]
+  )
+  return (result.rowCount ?? 0) > 0
+}
+
+export async function getDeletedSales(
+  businessId: string,
+  options?: { limit?: number; cursor?: string }
+): Promise<{ sales: Sale[]; nextCursor?: string; hasMore: boolean }> {
+  const limit = options?.limit || 50
+  const cursor = options?.cursor
+
+  let queryText = `SELECT * FROM sales WHERE business_id = $1 AND is_deleted = TRUE`
+  const params: unknown[] = [businessId]
+  let paramIndex = 2
+
+  if (cursor) {
+    queryText += ` AND id < $${paramIndex}`
+    params.push(cursor)
+    paramIndex++
+  }
+
+  queryText += ` ORDER BY updated_at DESC, id DESC LIMIT $${paramIndex}`
+  params.push(limit + 1)
+
+  const result = await query(queryText, params)
+  const hasMore = result.rows.length > limit
+  const sales = result.rows.slice(0, limit).map(mapSaleRow)
+  const nextCursor = hasMore ? result.rows[limit - 1].id : undefined
+
+  return { sales, nextCursor, hasMore }
+}
+
 function mapSaleRow(row: Record<string, unknown>): Sale {
   return {
     id: row.id as string,

@@ -5,12 +5,14 @@ import {
   login as apiLogin,
   logout as apiLogout,
   register as apiRegister,
+  sendVerification as apiSendVerification,
 } from '../services/api'
 
 type AuthUser = {
   id: string
   businessId: string
   email: string
+  emailVerified?: boolean
 }
 
 type AuthState = {
@@ -23,6 +25,8 @@ type AuthContextValue = AuthState & {
   register: (email: string, password: string, businessName?: string) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
+  sendVerification: () => Promise<void>
+  refreshEmailStatus: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -63,12 +67,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ user: null, isLoading: false })
   }, [])
 
+  const sendVerification = useCallback(async () => {
+    await apiSendVerification()
+  }, [])
+
+  const refreshEmailStatus = useCallback(() => {
+    const tokens = loadAuthTokens()
+    if (tokens?.user) {
+      setState((prev) => ({ ...prev, user: tokens.user }))
+    }
+  }, [])
+
   const value: AuthContextValue = {
     ...state,
     login,
     register,
     logout,
     isAuthenticated: checkAuth(),
+    sendVerification,
+    refreshEmailStatus,
   }
 
   return <AuthContext value={value}>{children}</AuthContext>
