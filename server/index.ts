@@ -1,9 +1,4 @@
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { config } from 'dotenv'
-
-config({ path: resolve(dirname(fileURLToPath(import.meta.url)), '.env') })
-
+import './bootstrap.js'
 import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
@@ -17,6 +12,9 @@ import { dataRouter } from './routes/data.js'
 import { reportsRouter } from './routes/reports.js'
 import { messagesRouter } from './routes/messages.js'
 import { remindersRouter } from './routes/reminders.js'
+import { checkOllamaHealth } from './providers/OllamaProvider.js'
+import { getAIProvider } from './providers/index.js'
+import { startScheduler, stopScheduler, getScheduledJobs } from './services/scheduler.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -79,6 +77,37 @@ app.get('/health/ready', async (req, res) => {
   }
 })
 
+// AI health/status — public endpoint (no auth required)
+app.get('/api/ai/status', async (_req, res) => {
+  try {
+    const provider = getAIProvider()
+    const providerName = provider.name
+
+    let ollamaHealth: Awaited<ReturnType<typeof checkOllamaHealth>> | null = null
+    if (providerName === 'ollama') {
+      ollamaHealth = await checkOllamaHealth()
+    }
+
+    res.json({
+      provider: providerName,
+      available: provider.isAvailable(),
+      ollama: ollamaHealth,
+    })
+  } catch {
+    res.status(500).json({ error: 'Failed to check AI status' })
+  }
+})
+
+// Scheduled jobs status (authenticated)
+app.get('/api/jobs/status', async (req, res) => {
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  res.json({ jobs: getScheduledJobs() })
+})
+
 // Routes
 app.use('/api/auth', authLimiter, authRouter)
 app.use('/api/ai', aiLimiter, aiRouter)
@@ -89,7 +118,7 @@ app.use('/api/messages', messagesRouter)
 app.use('/api/reminders', remindersRouter)
 
 // Error handling
-app.use((err: Error, _req: express.Request, res: express.Response) => {
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err }, 'Server error')
   res.status(500).json({ 
     error: 'Internal server error',
@@ -99,6 +128,16 @@ app.use((err: Error, _req: express.Request, res: express.Response) => {
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, `Digital Khata Server running on port ${PORT}`)
+  startScheduler()
 })
+
+function shutdown() {
+  logger.info('Shutting down...')
+  stopScheduler()
+  process.exit(0)
+}
+
+process.on('SIGTERM', shutdown)
+process.on('SIGINT', shutdown)
 
 export default app
