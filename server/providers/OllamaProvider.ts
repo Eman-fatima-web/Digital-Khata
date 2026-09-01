@@ -3,17 +3,22 @@ import { createChildLogger } from '../services/logger.js'
 
 const log = createChildLogger({ module: 'ollama' })
 
-const DEFAULT_SERVICE_URL = 'http://localhost:8000'
+const DEFAULT_BASE_URL = 'http://localhost:11434'
 const REQUEST_TIMEOUT_MS = 30_000
 
+/**
+ * Ollama AI Provider — calls Ollama API directly for local LLM inference.
+ * Requires Ollama running at OLLAMA_BASE_URL (default: http://localhost:11434)
+ */
 export class OllamaProvider implements AIProvider {
   readonly name = 'ollama'
-  private serviceUrl: string
+  private baseUrl: string
   private model: string
 
   constructor() {
-    this.serviceUrl = (process.env.AI_SERVICE_URL || DEFAULT_SERVICE_URL).replace(/\/+$/, '')
-    this.model = process.env.OLLAMA_MODEL || 'gemma3'
+    this.baseUrl = (process.env.OLLAMA_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '')
+    this.model = process.env.OLLAMA_MODEL || 'qwen3:4b'
+    log.info({ baseUrl: this.baseUrl, model: this.model }, 'Ollama provider initialized')
   }
 
   isAvailable(): boolean {
@@ -27,10 +32,11 @@ export class OllamaProvider implements AIProvider {
       { role: 'user', content: request.prompt },
     ]
 
-    if (request.businessData) {
+    if (request.businessData && Object.keys(request.businessData).length > 0) {
+      const contextSummary = this.summarizeBusinessData(request.businessData)
       messages.push({
         role: 'system',
-        content: `Business context:\n${JSON.stringify(request.businessData, null, 2)}`,
+        content: `Business context:\n${contextSummary}`,
       })
     }
 
@@ -39,14 +45,17 @@ export class OllamaProvider implements AIProvider {
 
     let response: Response
     try {
-      response = await fetch(`${this.serviceUrl}/api/chat`, {
+      response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages,
           model: this.model,
-          max_tokens: request.maxTokens || 1000,
-          temperature: request.temperature || 0.7,
+          messages,
+          stream: false,
+          options: {
+            temperature: request.temperature || 0.7,
+            num_predict: request.maxTokens || 1000,
+          },
         }),
         signal: controller.signal,
       })
@@ -68,8 +77,9 @@ export class OllamaProvider implements AIProvider {
     }
 
     let data: {
-      response?: string
-      usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+      message?: { content?: string }
+      eval_count?: number
+      prompt_eval_count?: number
     }
     try {
       data = await response.json() as typeof data
@@ -77,18 +87,53 @@ export class OllamaProvider implements AIProvider {
       throw new Error('Ollama service returned invalid JSON')
     }
 
-    if (!data.response) {
+    if (!data.message?.content) {
       throw new Error('Ollama service returned empty response')
     }
 
+    const promptTokens = data.prompt_eval_count || 0
+    const completionTokens = data.eval_count || 0
+
     return {
-      text: data.response,
-      usage: data.usage ? {
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
+      text: data.message.content,
+      usage: (promptTokens > 0 || completionTokens > 0) ? {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
       } : undefined,
     }
+  }
+
+  /**
+   * Summarize business data to reduce token usage.
+   * Only include relevant counts and totals, not full customer lists.
+   */
+  private summarizeBusinessData(data: Record<string, unknown>): string {
+    const summary: Record<string, unknown> = {}
+    
+    if (data.customers && Array.isArray(data.customers)) {
+      summary.customerCount = data.customers.length
+    }
+    if (data.udhaar && Array.isArray(data.udhaar)) {
+      summary.udhaarCount = data.udhaar.length
+      const totalOutstanding = data.udhaar.reduce((sum: number, u: any) => sum + (u.remainingAmount || 0), 0)
+      summary.totalOutstanding = totalOutstanding
+    }
+    if (data.payments && Array.isArray(data.payments)) {
+      summary.paymentCount = data.payments.length
+      const totalPayments = data.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+      summary.totalPayments = totalPayments
+    }
+    if (data.sales && Array.isArray(data.sales)) {
+      summary.saleCount = data.sales.length
+      const totalSales = data.sales.reduce((sum: number, s: any) => sum + (s.amount || 0), 0)
+      summary.totalSales = totalSales
+    }
+    if (data.dateContext) {
+      summary.dateContext = data.dateContext
+    }
+
+    return JSON.stringify(summary, null, 2)
   }
 }
 
@@ -98,13 +143,13 @@ export async function checkOllamaHealth(): Promise<{
   models?: string[]
   error?: string
 }> {
-  const serviceUrl = (process.env.AI_SERVICE_URL || DEFAULT_SERVICE_URL).replace(/\/+$/, '')
+  const baseUrl = (process.env.OLLAMA_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '')
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const response = await fetch(`${serviceUrl}/api/health`, {
+    const response = await fetch(`${baseUrl}/api/tags`, {
       signal: controller.signal,
     })
     clearTimeout(timeout)
@@ -114,17 +159,17 @@ export async function checkOllamaHealth(): Promise<{
     }
 
     const data = await response.json() as {
-      ollama_status: string
-      model?: string
-      models?: string[]
-      error?: string
+      models?: Array<{ name: string; size?: number }>
     }
 
+    const modelNames = data.models?.map(m => m.name) || []
+    const configuredModel = process.env.OLLAMA_MODEL || 'qwen3:4b'
+    const hasConfiguredModel = modelNames.some(name => name.includes(configuredModel))
+
     return {
-      status: data.ollama_status === 'connected' ? 'connected' : 'disconnected',
-      model: data.model,
-      models: data.models,
-      error: data.error,
+      status: 'connected',
+      model: hasConfiguredModel ? configuredModel : modelNames[0],
+      models: modelNames,
     }
   } catch (error) {
     clearTimeout(timeout)
