@@ -12,6 +12,7 @@ import { dataRouter } from './routes/data.js'
 import { reportsRouter } from './routes/reports.js'
 import { messagesRouter } from './routes/messages.js'
 import { remindersRouter } from './routes/reminders.js'
+import { auditRouter } from './routes/audit.js'
 import { checkOllamaHealth } from './providers/OllamaProvider.js'
 import { getAIProvider } from './providers/index.js'
 import { startScheduler, stopScheduler, getScheduledJobs } from './services/scheduler.js'
@@ -116,6 +117,7 @@ app.use('/api/data', dataRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/messages', messagesRouter)
 app.use('/api/reminders', remindersRouter)
+app.use('/api/audit', auditRouter)
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

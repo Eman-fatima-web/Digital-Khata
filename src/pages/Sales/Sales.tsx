@@ -132,7 +132,8 @@ function Sales() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search sales by customer or description..."
-            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-100"
+            aria-label="Search sales by customer or description"
+            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-400"
           />
         </div>
       </section>
@@ -202,11 +203,12 @@ function Sales() {
       >
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Customer (optional)</label>
+            <label htmlFor="sale-customer" className="mb-2 block text-sm font-semibold text-ink-light">Customer (optional)</label>
             <select
+              id="sale-customer"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             >
               <option value="">Walk-in sale</option>
               {customers.map((customer: Customer) => (
@@ -218,38 +220,41 @@ function Sales() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Description</label>
+            <label htmlFor="sale-description" className="mb-2 block text-sm font-semibold text-ink-light">Description</label>
             <input
+              id="sale-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Bulk order"
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Amount</label>
+            <label htmlFor="sale-amount" className="mb-2 block text-sm font-semibold text-ink-light">Amount</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-muted">Rs.</span>
               <input
+                id="sale-amount"
                 type="number"
                 min="1"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Date</label>
+            <label htmlFor="sale-date" className="mb-2 block text-sm font-semibold text-ink-light">Date</label>
             <input
+              id="sale-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 

@@ -24,6 +24,19 @@ export async function processInput(
   // Run the local engine first with pronoun resolution
   let result = runEngine(input, data, language, resolvedCustomerName)
 
+  // Active-customer fallback: if the engine needs a customer and we have an active
+  // one from context, retry with that customer name injected
+  if (result.type === 'clarification' && !resolvedCustomerName) {
+    const activeName = context.activeCustomerName ?? context.lastCustomerName
+    if (activeName) {
+      const retry = runEngine(input, data, language, activeName)
+      if (retry.type !== 'clarification') {
+        result = retry
+        resolvedCustomerName = activeName
+      }
+    }
+  }
+
   // Compound intent splitting: if the engine returns UNKNOWN, try splitting
   // the input on conjunctions and process each part independently
   if (result.type === 'fallback') {

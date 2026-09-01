@@ -108,7 +108,8 @@ function Customers() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('customers.searchPlaceholder')}
-            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-100"
+            aria-label={t('customers.searchPlaceholder')}
+            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-400"
           />
         </div>
 
@@ -195,29 +196,31 @@ function Customers() {
       >
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">
+            <label htmlFor="customer-name" className="mb-2 block text-sm font-semibold text-ink-light">
               {t('customers.customerName')}
             </label>
             <input
+              id="customer-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter customer name"
               autoFocus
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">
+            <label htmlFor="customer-phone" className="mb-2 block text-sm font-semibold text-ink-light">
               {t('customers.phoneNumber')}
             </label>
             <input
+              id="customer-phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="03XX XXXXXXX"
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 

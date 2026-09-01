@@ -17,31 +17,31 @@ const owner = { userId: 'user-1', shopId: 'shop-1' }
 
 describe('Restore — Intent Detection', () => {
   it('detects RESTORE_CUSTOMER', () => {
-    expect(detectIntent('customer restore karo')).toBe('RESTORE_CUSTOMER')
-    expect(detectIntent('gahak recover karo')).toBe('RESTORE_CUSTOMER')
+    expect(detectIntent('restore customer')).toBe('RESTORE_CUSTOMER')
+    expect(detectIntent('recover customer')).toBe('RESTORE_CUSTOMER')
     expect(detectIntent('گاہک بحال کرو')).toBe('RESTORE_CUSTOMER')
   })
 
   it('detects RESTORE_UDHAAR', () => {
-    expect(detectIntent('udhaar restore karo')).toBe('RESTORE_UDHAAR')
-    expect(detectIntent('udhaar recover karo')).toBe('RESTORE_UDHAAR')
+    expect(detectIntent('restore credit')).toBe('RESTORE_UDHAAR')
+    expect(detectIntent('recover credit')).toBe('RESTORE_UDHAAR')
     expect(detectIntent('قرض بحال کرو')).toBe('RESTORE_UDHAAR')
   })
 
   it('detects RESTORE_PAYMENT', () => {
-    expect(detectIntent('Ahmed ki payment restore karo')).toBe('RESTORE_PAYMENT')
-    expect(detectIntent('payment recover karo')).toBe('RESTORE_PAYMENT')
+    expect(detectIntent('restore payment Ahmed')).toBe('RESTORE_PAYMENT')
+    expect(detectIntent('recover payment')).toBe('RESTORE_PAYMENT')
     expect(detectIntent('ادائیگی بحال کرو')).toBe('RESTORE_PAYMENT')
   })
 
   it('detects RESTORE_SALE', () => {
-    expect(detectIntent('Ahmed ki sale restore karo')).toBe('RESTORE_SALE')
-    expect(detectIntent('sale recover karo')).toBe('RESTORE_SALE')
+    expect(detectIntent('restore sale Ahmed')).toBe('RESTORE_SALE')
+    expect(detectIntent('recover sale')).toBe('RESTORE_SALE')
     expect(detectIntent('فروخت بحال کرو')).toBe('RESTORE_SALE')
   })
 
   it('does not detect restore for questions', () => {
-    expect(detectIntent('customer restore kya hota hai')).toBe('UNKNOWN')
+    expect(detectIntent('what is customer restore')).toBe('UNKNOWN')
   })
 })
 
@@ -140,7 +140,7 @@ describe('Restore — Engine', () => {
   }
 
   it('RESTORE_CUSTOMER produces a proposal', () => {
-    const result = runEngine('customer Ali restore karo', snapshot, 'en')
+    const result = runEngine('restore customer Ali', snapshot, 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('RESTORE_CUSTOMER')
@@ -150,7 +150,7 @@ describe('Restore — Engine', () => {
   })
 
   it('RESTORE_UDHAAR produces a proposal', () => {
-    const result = runEngine('Ali ka udhaar restore karo', snapshot, 'en')
+    const result = runEngine('restore credit Ali', snapshot, 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('RESTORE_UDHAAR')
@@ -160,7 +160,7 @@ describe('Restore — Engine', () => {
   })
 
   it('RESTORE_PAYMENT produces a proposal', () => {
-    const result = runEngine('Ali ki payment restore karo', snapshot, 'en')
+    const result = runEngine('restore payment Ali', snapshot, 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('RESTORE_PAYMENT')
@@ -170,7 +170,7 @@ describe('Restore — Engine', () => {
   })
 
   it('RESTORE_SALE produces a proposal', () => {
-    const result = runEngine('Ali ki sale restore karo', snapshot, 'en')
+    const result = runEngine('restore sale Ali', snapshot, 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('RESTORE_SALE')
@@ -180,12 +180,12 @@ describe('Restore — Engine', () => {
   })
 
   it('RESTORE_CUSTOMER asks for customer if not found', () => {
-    const result = runEngine('customer restore karo', snapshot, 'en')
+    const result = runEngine('restore customer', snapshot, 'en')
     expect(result.type).toBe('clarification')
   })
 
-  it('RESTORE_CUSTOMER in Urdu produces a proposal', () => {
-    const result = runEngine('gahak Ali ko wapas lao', snapshot, 'en')
+  it('RESTORE_CUSTOMER with recover keyword produces a proposal', () => {
+    const result = runEngine('recover customer Ali', snapshot, 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('RESTORE_CUSTOMER')

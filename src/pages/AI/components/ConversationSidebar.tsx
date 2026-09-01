@@ -1,4 +1,5 @@
-import { MessageSquarePlus, Trash2, X, MessageSquare } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { MessageSquarePlus, Trash2, X, MessageSquare, Pencil, Check, Search } from 'lucide-react'
 import type { Conversation } from '../../../core/types'
 import type { TranslationKey } from '../../../core/i18n'
 import { cn } from '../../../lib/utils'
@@ -11,6 +12,7 @@ type Props = {
   onNew: () => void
   onSelect: (id: string) => void
   onDelete: (id: string) => void
+  onRename: (id: string, title: string) => void
   t: (key: TranslationKey) => string
 }
 
@@ -36,11 +38,39 @@ export function ConversationSidebar({
   onNew,
   onSelect,
   onDelete,
+  onRename,
   t,
 }: Props) {
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return conversations
+    const q = searchQuery.toLowerCase()
+    return conversations.filter((c) => c.title.toLowerCase().includes(q))
+  }, [conversations, searchQuery])
+
+  function startRename(conv: Conversation) {
+    setRenamingId(conv.id)
+    setRenameValue(conv.title)
+  }
+
+  function commitRename() {
+    if (renamingId && renameValue.trim()) {
+      onRename(renamingId, renameValue.trim())
+    }
+    setRenamingId(null)
+    setRenameValue('')
+  }
+
+  function cancelRename() {
+    setRenamingId(null)
+    setRenameValue('')
+  }
+
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 md:hidden"
@@ -79,58 +109,132 @@ export function ConversationSidebar({
           </div>
         </div>
 
+        {/* Search */}
+        {conversations.length > 0 && (
+          <div className="border-b border-surface-hairline px-3 py-2">
+            <div className="flex items-center gap-2 rounded-lg bg-surface-hover px-2.5 py-1.5">
+              <Search size={14} className="shrink-0 text-ink-subtle" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('ai.searchChats') || 'Search conversations...'}
+                className="w-full bg-transparent text-xs text-ink placeholder:text-ink-subtle focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="shrink-0 text-ink-subtle hover:text-ink"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto p-2">
-          {conversations.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
               <MessageSquare size={24} className="text-ink-subtle" />
-              <p className="text-xs text-ink-muted">{t('ai.newChat')}</p>
+              <p className="text-xs text-ink-muted">
+                {searchQuery ? 'No matching conversations' : t('ai.newChat')}
+              </p>
             </div>
           ) : (
             <ul className="space-y-0.5">
-              {conversations.map((conv) => (
-                <li key={conv.id}>
-                  <div
-                    className={cn(
-                      'group flex items-center gap-2 rounded-lg px-3 py-2.5 transition cursor-pointer',
-                      conv.id === activeId
-                        ? 'bg-primary-500/10 text-primary-700'
-                        : 'text-ink-muted hover:bg-surface-hover hover:text-ink',
+              {filtered.map((conv) => {
+                const isRenaming = renamingId === conv.id
+                return (
+                  <li key={conv.id}>
+                    {isRenaming ? (
+                      <div className="flex items-center gap-1 rounded-lg bg-primary-500/10 px-3 py-2">
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitRename()
+                            if (e.key === 'Escape') cancelRename()
+                          }}
+                          className="min-w-0 flex-1 rounded bg-transparent text-sm font-medium text-ink focus:outline-none focus:ring-1 focus:ring-primary-500"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={commitRename}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-primary-600 hover:bg-primary-500/20"
+                        >
+                          <Check size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelRename}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-subtle hover:bg-surface-hover"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          'group flex items-center gap-2 rounded-lg px-3 py-2.5 transition cursor-pointer',
+                          conv.id === activeId
+                            ? 'bg-primary-500/10 text-primary-700'
+                            : 'text-ink-muted hover:bg-surface-hover hover:text-ink',
+                        )}
+                        onClick={() => {
+                          onSelect(conv.id)
+                          onClose()
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onSelect(conv.id)
+                            onClose()
+                          }
+                        }}
+                      >
+                        <MessageSquare size={15} className="shrink-0 opacity-60" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{conv.title}</p>
+                          <p className="text-[10px] opacity-60">{relativeDate(conv.updatedAt)}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              startRename(conv)
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition hover:bg-surface-hover hover:text-ink"
+                            aria-label={t('ai.renameChat')}
+                            title={t('ai.renameChat')}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onDelete(conv.id)
+                            }}
+                            className="flex h-6 w-6 items-center justify-center rounded text-ink-subtle transition hover:bg-danger/10 hover:text-danger"
+                            aria-label={t('ai.deleteChat')}
+                            title={t('ai.deleteChat')}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    onClick={() => {
-                      onSelect(conv.id)
-                      onClose()
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        onSelect(conv.id)
-                        onClose()
-                      }
-                    }}
-                  >
-                    <MessageSquare size={15} className="shrink-0 opacity-60" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{conv.title}</p>
-                      <p className="text-[10px] opacity-60">{relativeDate(conv.updatedAt)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(conv.id)
-                      }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-subtle opacity-0 transition hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-                      aria-label={t('ai.deleteChat')}
-                      title={t('ai.deleteChat')}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>

@@ -22,6 +22,8 @@ CREATE TABLE users (
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
   verification_token VARCHAR(255),
   verification_token_expiry TIMESTAMP WITH TIME ZONE,
+  password_reset_token VARCHAR(255),
+  password_reset_token_expiry TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
-import { Brain, ChevronDown, Menu, Mic, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
+import { Brain, ChevronDown, Copy, Check, Menu, Mic, Phone, Send, Sparkles, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useCustomers, usePayments, useSales, useUdhaar } from '../../hooks/useKhataData'
@@ -9,6 +9,7 @@ import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
 import { useVoiceOutput } from '../../hooks/useVoiceOutput'
 import { useApp } from '../../hooks/useApp'
+import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import { CloudAIAdapter } from '../../features/ai/adapters'
 import { getResponses } from '../../features/ai/responses'
 import type { ActionKind, ActionProposal, AIResult, ConversationContext, KhataSnapshot, ReportCardData } from '../../features/ai/types'
@@ -48,8 +49,10 @@ import {
 import type { Conversation } from '../../core/types'
 import { ConversationSidebar } from './components/ConversationSidebar'
 import { cn, formatCurrency, formatDate, generateId, localDateKey, nowISO } from '../../lib/utils'
+import { renderMarkdown } from '../../lib/markdown'
 import { ConfirmCard } from '../../components/ui/ConfirmCard'
 import { CustomerCard, TransactionCard, NavigationCard, ReportCard } from '../../components/ai/ActionCards'
+import { VoiceCallModal } from '../../components/ai/VoiceCallModal'
 
 type ProposalState = 'pending' | 'executing' | 'confirmed' | 'cancelled'
 
@@ -98,6 +101,8 @@ function UserBubble({ text, time }: { text: string; time: string }) {
   )
 }
 
+const MemoizedUserBubble = React.memo(UserBubble)
+
 function AiBubble({ 
   text, 
   time, 
@@ -115,39 +120,72 @@ function AiBubble({
   onSpeak?: (messageId: string, text: string) => void
   voiceAvailable?: boolean
 }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [text])
+
   return (
     <div className="flex flex-col items-start gap-1">
-      <div className="flex max-w-[85%] items-start gap-2.5 sm:max-w-[75%]">
+      <div className="group/bubble relative flex max-w-[85%] items-start gap-2.5 sm:max-w-[75%]">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-sm">
           <Brain size={14} />
         </div>
         <div className="min-w-0 rounded-2xl rounded-ss-md border border-surface-hairline bg-surface-card px-4 py-3 text-sm leading-6 text-ink shadow-sm">
-          <p className="whitespace-pre-line">{text}</p>
-          {messageId && voiceAvailable && onSpeak && (
+          <div className="ai-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />
+          <div className="mt-2 flex items-center gap-2">
+            {messageId && voiceAvailable && onSpeak && (
+              <button
+                type="button"
+                onClick={() => onSpeak(messageId, text)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition',
+                  isSpeaking
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-surface-hover text-ink-muted hover:text-primary-600',
+                )}
+                aria-label={isSpeaking ? 'Stop speaking' : 'Speak response'}
+              >
+                {isSpeaking ? (
+                  <>
+                    <X size={13} />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Volume2 size={13} />
+                    Speak
+                  </>
+                )}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => onSpeak(messageId, text)}
-              className={cn(
-                'mt-2 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition',
-                isSpeaking
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'bg-surface-hover text-ink-muted hover:text-primary-600',
-              )}
-              aria-label={isSpeaking ? 'Stop speaking' : 'Speak response'}
+              onClick={handleCopy}
+              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-ink-subtle opacity-0 transition hover:bg-surface-hover hover:text-ink group-hover/bubble:opacity-100"
+              aria-label="Copy response"
             >
-              {isSpeaking ? (
-                <>
-                  <X size={13} />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <Volume2 size={13} />
-                  Speak
-                </>
-              )}
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
-          )}
+          </div>
           {children}
         </div>
       </div>
@@ -156,6 +194,8 @@ function AiBubble({
   )
 }
 
+const MemoizedAiBubble = React.memo(AiBubble)
+
 function ProactiveInsightChips({
   data,
   language,
@@ -163,7 +203,7 @@ function ProactiveInsightChips({
   onSend,
 }: {
   data: KhataSnapshot
-  language: 'en' | 'ur' | 'rom'
+  language: 'en' | 'ur'
   t: (key: TranslationKey) => string
   onSend: (text: string) => void
 }) {
@@ -196,6 +236,7 @@ function AI() {
   const location = useLocation()
   const navigate = useNavigate()
   const { setTheme, setLanguage } = useApp()
+  const { updatePrefs } = useNotificationPreferences()
 
   const customers = useCustomers()
   const udhaar = useUdhaar()
@@ -221,6 +262,7 @@ function AI() {
     sessionStorage.getItem('dk-active-conversation'),
   )
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false)
   const titleGeneratedRef = useRef(false)
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
@@ -314,11 +356,12 @@ function AI() {
     }
   }, [owner])
 
-  const formatTime = (iso: string) =>
+  const formatTime = useCallback((iso: string) =>
     new Date(iso).toLocaleTimeString(language === 'ur' ? 'ur-PK' : 'en-PK', {
       hour: '2-digit',
       minute: '2-digit',
-    })
+    }),
+  [language])
 
   const pushMessage = (
     role: 'user' | 'ai',
@@ -392,8 +435,6 @@ function AI() {
       result = { type: 'answer', text: getResponses(language).actionFailed() }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 450))
-
     setThinking(false)
 
     if (result.type === 'proposal') {
@@ -407,11 +448,52 @@ function AI() {
     } else if (result.type === 'fallback') {
       const fallbackText = getResponses(language).fallback(isOnline, cloudAvailable)
       pushMessage('ai', fallbackText)
-      if (autoSpeak) void voice.speak(fallbackText, language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en')
+      if (autoSpeak) void voice.speak(fallbackText, language === 'ur' ? 'ur' : 'en')
     } else {
       pushMessage('ai', result.text, undefined, result.type === 'answer' ? result.cardData : undefined)
-      if (autoSpeak) void voice.speak(result.text, language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en')
+      if (autoSpeak) void voice.speak(result.text, language === 'ur' ? 'ur' : 'en')
     }
+  }
+
+  const handleVoiceCallSend = async (text: string): Promise<string> => {
+    pushMessage('user', text)
+
+    let result: AIResult
+    try {
+      const { result: orchestratorResult, updatedContext } = await processInput(
+        text,
+        contextRef.current,
+        {
+          customers: customers ?? [],
+          udhaar: udhaar ?? [],
+          payments: payments ?? [],
+          sales: sales ?? [],
+        },
+        language,
+        isOnline,
+      )
+      result = orchestratorResult
+      contextRef.current = updatedContext
+      setLastIntent(updatedContext.lastIntent)
+    } catch {
+      result = { type: 'answer', text: getResponses(language).actionFailed() }
+    }
+
+    if (result.type === 'proposal') {
+      if (result.proposal.kind === 'NAVIGATE' && result.proposal.path) {
+        navigate(result.proposal.path)
+      }
+      pushMessage('ai', result.text, result.proposal)
+    } else if (result.type === 'fallback') {
+      const fallbackText = getResponses(language).fallback(isOnline, cloudAvailable)
+      pushMessage('ai', fallbackText)
+      return fallbackText
+    } else {
+      pushMessage('ai', result.text, undefined, result.type === 'answer' ? result.cardData : undefined)
+    }
+
+    setTimeout(() => scrollToBottom(true), 100)
+    return result.text
   }
 
   const handleSubmit = (event: FormEvent) => {
@@ -451,7 +533,7 @@ function AI() {
     }
 
     const recognition = new Ctor()
-    recognition.lang = language === 'ur' ? 'ur-PK' : language === 'rom' ? 'ur-PK' : 'en-US'
+    recognition.lang = language === 'ur' ? 'ur-PK' : 'en-US'
     recognition.interimResults = true
     recognition.continuous = false
 
@@ -655,6 +737,19 @@ function AI() {
         }
         return r.actionFailed()
       }
+
+      case 'SET_NOTIFICATION_PREFS': {
+        if (proposal.setting === 'notifications' && proposal.notificationPrefs) {
+          updatePrefs(proposal.notificationPrefs)
+          const changes = Object.entries(proposal.notificationPrefs)
+            .map(([k, v]) => `${k}: ${v ? 'on' : 'off'}`)
+            .join(', ')
+          return language === 'ur'
+            ? `نوٹیفکیشن تبدیل ہو گئیں۔ ${changes}`
+            : `Notification preferences updated. ${changes}`
+        }
+        return r.actionFailed()
+      }
     }
   }
 
@@ -710,7 +805,7 @@ function AI() {
 
     // Start speaking
     setSpeakingMessageId(messageId)
-    const voiceLanguage = language === 'ur' ? 'ur' : language === 'rom' ? 'rom' : 'en'
+    const voiceLanguage = language === 'ur' ? 'ur' : 'en'
     const success = await voice.speak(text, voiceLanguage)
 
     if (!success && voice.state !== 'speaking') {
@@ -731,7 +826,7 @@ function AI() {
     }
   }
 
-  const actionLabels: Record<ActionKind, string> = {
+  const actionLabels = useMemo<Record<ActionKind, string>>(() => ({
     RECORD_PAYMENT: t('ai.actionPayment'),
     ADD_UDHAAR: t('ai.actionUdhaar'),
     DELETE_UDHAAR: t('ai.actionDeleteUdhaar'),
@@ -750,7 +845,7 @@ function AI() {
     NAVIGATE: t('ai.actionNavigate'),
     SET_THEME: t('ai.actionSetTheme'),
     SET_LANGUAGE: t('ai.actionSetLanguage'),
-  }
+  }), [t])
 
   const buildRows = (proposal: ActionProposal) => {
     const rows = [{ label: t('ai.fieldAction'), value: actionLabels[proposal.kind] }]
@@ -787,17 +882,20 @@ function AI() {
     return rows
   }
 
-  const status = !isOnline
+  const status = useMemo(() => !isOnline
     ? { icon: WifiOff, label: t('ai.offlineStatus'), className: 'bg-warning/10 text-warning' }
     : cloudAvailable
       ? { icon: Sparkles, label: t('ai.cloudStatus'), className: 'bg-info/10 text-info' }
-      : { icon: Wifi, label: t('ai.onlineStatus'), className: 'bg-success-50 text-success-600' }
+      : { icon: Wifi, label: t('ai.onlineStatus'), className: 'bg-success-50 text-success-600' },
+  [isOnline, cloudAvailable, t])
   const StatusIcon = status.icon
 
-  const suggestions = useMemo(() => {
-    const hasOverdue = (udhaar ?? []).some((e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < new Date().toISOString().split('T')[0])
+  const hasOverdue = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return (udhaar ?? []).some((e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < today)
+  }, [udhaar])
 
-    // Default suggestions for fresh chat
+  const suggestions = useMemo(() => {
     if (messages.length <= 1) {
       return [
         t('ai.suggestions.balance'),
@@ -808,7 +906,6 @@ function AI() {
       ]
     }
 
-    // Contextual suggestions based on last intent
     if (lastIntent === 'CUSTOMER_BALANCE') {
       return [t('ai.suggestions.sendReminder'), t('ai.suggestions.recordPayment'), t('ai.suggestions.showHistory')]
     }
@@ -819,13 +916,12 @@ function AI() {
       return [t('ai.suggestions.overdueList'), t('ai.suggestions.sendReminder'), t('ai.suggestions.viewTotal')]
     }
 
-    // Fallback to default
     return [
       t('ai.suggestions.balance'),
       t('ai.suggestions.topDebtor'),
       t('ai.suggestions.sales'),
     ]
-  }, [messages.length, udhaar, lastIntent, t])
+  }, [messages.length, hasOverdue, lastIntent, t])
 
   /** Determine if a proposal kind requires explicit user confirmation */
   const requiresActionConfirmation = (kind: ActionKind): boolean => {
@@ -932,6 +1028,13 @@ function AI() {
         onNew={() => void handleNewChat()}
         onSelect={(id) => void handleSelectConversation(id)}
         onDelete={(id) => void handleDeleteConversation(id)}
+        onRename={(id, title) => {
+          void updateConversationTitle(id, title).then(() => {
+            setConversations((prev) =>
+              prev.map((c) => (c.id === id ? { ...c, title, updatedAt: new Date().toISOString() } : c)),
+            )
+          })
+        }}
         t={t}
       />
       <div className="mx-auto flex min-w-0 flex-1 flex-col px-4">
@@ -955,7 +1058,17 @@ function AI() {
             <p className="truncate text-xs text-ink-muted">{t('ai.subtitle')}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setVoiceCallOpen(true)}
+            aria-label={t('ai.voiceCall')}
+            title={t('ai.voiceCall')}
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-[11px] font-semibold text-ink-muted transition hover:bg-surface-hover hover:text-primary-600"
+          >
+            <Phone size={13} />
+            <span className="hidden sm:inline">{t('ai.voiceCall')}</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -987,7 +1100,7 @@ function AI() {
 
       <div className="relative mt-4 flex flex-1 flex-col overflow-hidden">
         <div ref={scrollRef} role="log" aria-live="polite" onScroll={handleScroll} className="scrollbar-hidden flex-1 space-y-4 overflow-y-auto pe-1">
-        <AiBubble text={t('ai.welcome')} />
+        <MemoizedAiBubble text={t('ai.welcome')} />
 
         {messages.length <= 1 && (
           <ProactiveInsightChips
@@ -1005,13 +1118,13 @@ function AI() {
 
         {messages.map((message) =>
           message.role === 'user' ? (
-            <UserBubble
+            <MemoizedUserBubble
               key={message.id}
               text={message.text}
               time={formatTime(message.createdAt)}
             />
           ) : (
-            <AiBubble
+            <MemoizedAiBubble
               key={message.id}
               messageId={message.id}
               text={message.text}
@@ -1053,7 +1166,7 @@ function AI() {
                   onCancel={() => handleCancel(message.id)}
                 />
               )}
-            </AiBubble>
+            </MemoizedAiBubble>
           ),
         )}
 
@@ -1156,6 +1269,13 @@ function AI() {
         </button>
       </form>
       </div>
+      <VoiceCallModal
+        isOpen={voiceCallOpen}
+        onClose={() => setVoiceCallOpen(false)}
+        onSend={handleVoiceCallSend}
+        language={language}
+        t={t}
+      />
     </div>
   )
 }

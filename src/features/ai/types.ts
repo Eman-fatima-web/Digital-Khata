@@ -31,7 +31,7 @@ export type ReportCardData = {
   items: { label: string; value: number }[]
 }
 
-export type AILanguage = 'en' | 'ur' | 'rom'
+export type AILanguage = 'en' | 'ur'
 
 export type ConversationTurn = {
   role: 'user' | 'ai'

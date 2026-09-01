@@ -71,7 +71,7 @@ export class BrowserTTSProvider implements VoiceProvider {
     // Set language
     if (language === 'ur') {
       utterance.lang = 'ur-PK'
-    } else if (language === 'en-UR' || language === 'rom') {
+    } else if (language === 'en-UR') {
       utterance.lang = 'ur-PK'
     } else {
       utterance.lang = 'en-US'
@@ -151,7 +151,7 @@ export class BrowserTTSProvider implements VoiceProvider {
       return null
     }
 
-    if (language === 'ur' || language === 'en-UR' || language === 'rom') {
+    if (language === 'ur' || language === 'en-UR') {
       // Try to find Urdu voice
       const urduVoice = voices.find(
         (v) =>

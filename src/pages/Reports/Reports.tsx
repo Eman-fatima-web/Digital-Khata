@@ -290,6 +290,7 @@ function Reports() {
           <button
             key={f.key}
             onClick={() => setPeriod(f.key)}
+            aria-pressed={period === f.key}
             className={`
               rounded-full px-4 py-2 text-sm font-semibold transition
               ${
@@ -456,7 +457,7 @@ function Reports() {
                     className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-surface sm:px-6"
                   >
                     <div>
-                      <p className="font-semibold text-ink">{item.title}</p>
+                      <p className="truncate font-semibold text-ink">{item.title}</p>
                       <p className="text-xs text-ink-muted">{formatDate(item.date)}</p>
                     </div>
                     <p

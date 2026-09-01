@@ -127,6 +127,7 @@ export type ActionKind =
   | 'NAVIGATE'
   | 'SET_THEME'
   | 'SET_LANGUAGE'
+  | 'SET_NOTIFICATION_PREFS'
 
 // Metadata about an AI-proposed action. References entities by id; never a
 // copy of the financial records themselves.
@@ -146,12 +147,13 @@ export type ActionProposal = {
   saleId?: string
   saleDate?: string
   date?: string
-  note?: { en: string; ur: string; rom?: string }
+  note?: { en: string; ur: string }
   // Navigation action
   path?: string
   // Settings action
   setting?: 'theme' | 'language' | 'notifications'
   settingValue?: string
+  notificationPrefs?: Record<string, boolean>
 }
 
 // Persisted Khata AI chat message. Deliberately carries no sync fields:

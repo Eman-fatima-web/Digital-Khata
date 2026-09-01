@@ -171,7 +171,8 @@ function Udhaar() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('udhaar.searchPlaceholder')}
-            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-100"
+            aria-label={t('udhaar.searchPlaceholder')}
+            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-400"
           />
         </div>
       </section>
@@ -279,11 +280,12 @@ function Udhaar() {
       >
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Customer</label>
+            <label htmlFor="udhaar-customer" className="mb-2 block text-sm font-semibold text-ink-light">Customer</label>
             <select
+              id="udhaar-customer"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             >
               <option value="">Select a customer</option>
               {customers.map((customer: Customer) => (
@@ -295,38 +297,41 @@ function Udhaar() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Description</label>
+            <label htmlFor="udhaar-description" className="mb-2 block text-sm font-semibold text-ink-light">Description</label>
             <input
+              id="udhaar-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Grocery items"
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Credit Amount</label>
+            <label htmlFor="udhaar-amount" className="mb-2 block text-sm font-semibold text-ink-light">Credit Amount</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-muted">Rs.</span>
               <input
+                id="udhaar-amount"
                 type="number"
                 min="1"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">{t('udhaar.dueDate')}</label>
+            <label htmlFor="udhaar-duedate" className="mb-2 block text-sm font-semibold text-ink-light">{t('udhaar.dueDate')}</label>
             <input
+              id="udhaar-duedate"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 

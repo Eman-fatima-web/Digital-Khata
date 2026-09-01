@@ -28,11 +28,6 @@ describe('formatCurrency', () => {
     const result = formatCurrency(1000, 'ur')
     expect(result).toContain('Rs.')
   })
-
-  it('uses en-PK locale for Roman Urdu', () => {
-    const result = formatCurrency(1000, 'rom')
-    expect(result).toContain('Rs.')
-  })
 })
 
 describe('formatDate', () => {
@@ -49,11 +44,6 @@ describe('formatDate', () => {
   it('formats with Urdu locale', () => {
     const result = formatDate('2026-06-15', 'ur')
     expect(result.length).toBeGreaterThan(0)
-  })
-
-  it('formats with Roman Urdu locale (uses en-PK)', () => {
-    const result = formatDate('2026-06-15', 'rom')
-    expect(result).toContain('2026')
   })
 })
 

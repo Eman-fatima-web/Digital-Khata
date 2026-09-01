@@ -176,7 +176,8 @@ function Payments() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('payments.searchPlaceholder')}
-            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-100"
+            aria-label={t('payments.searchPlaceholder')}
+            className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-11 pr-4 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-success-300 focus:ring-4 focus:ring-success-400"
           />
         </div>
       </section>
@@ -264,14 +265,15 @@ function Payments() {
       >
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Customer</label>
+            <label htmlFor="payment-customer" className="mb-2 block text-sm font-semibold text-ink-light">Customer</label>
             <select
+              id="payment-customer"
               value={customerId}
               onChange={(e) => {
                 setCustomerId(e.target.value)
                 setUdhaarId('')
               }}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             >
               <option value="">Select a customer</option>
               {customers.map((customer: Customer) => (
@@ -283,12 +285,13 @@ function Payments() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">Against Udhaar (optional)</label>
+            <label htmlFor="payment-udhaar" className="mb-2 block text-sm font-semibold text-ink-light">Against Udhaar (optional)</label>
             <select
+              id="payment-udhaar"
               value={udhaarId}
               onChange={(e) => setUdhaarId(e.target.value)}
               disabled={!customerId || customerUdhaar.length === 0}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100 disabled:opacity-50"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400 disabled:opacity-50"
             >
               <option value="">No specific udhaar</option>
               {customerUdhaar.map((entry) => (
@@ -300,26 +303,28 @@ function Payments() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.amount')}</label>
+            <label htmlFor="payment-amount" className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.amount')}</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-muted">Rs.</span>
               <input
+                id="payment-amount"
                 type="number"
                 min="1"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
-                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+                className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card pl-12 pr-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.paymentMethod')}</label>
+            <label htmlFor="payment-method" className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.paymentMethod')}</label>
             <select
+              id="payment-method"
               value={method}
               onChange={(e) => setMethod(e.target.value as (typeof PAYMENT_METHODS)[number])}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             >
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
@@ -330,12 +335,13 @@ function Payments() {
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.date')}</label>
+            <label htmlFor="payment-date" className="mb-2 block text-sm font-semibold text-ink-light">{t('payments.date')}</label>
             <input
+              id="payment-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-100"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
           </div>
 

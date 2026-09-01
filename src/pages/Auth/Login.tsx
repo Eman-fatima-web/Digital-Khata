@@ -80,6 +80,12 @@ export default function Login() {
               />
             </div>
 
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm font-medium text-primary-500 hover:text-primary-600">
+                Forgot password?
+              </Link>
+            </div>
+
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Login
             </Button>

@@ -39,7 +39,7 @@ function isValidUnlockToken(token: string | null): boolean {
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'light'
   const stored = localStorage.getItem(STORAGE_KEYS.THEME) as Theme | null
-  if (stored === 'light' || stored === 'dark') return stored
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
   if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark'
   return 'light'
 }
@@ -47,7 +47,7 @@ function getInitialTheme(): Theme {
 function getInitialLanguage(): LanguageCode {
   if (typeof window === 'undefined') return 'en'
   const stored = localStorage.getItem(STORAGE_KEYS.LANGUAGE) as LanguageCode | null
-  if (stored === 'en' || stored === 'ur' || stored === 'rom') return stored
+  if (stored === 'en' || stored === 'ur') return stored
   return 'en'
 }
 
@@ -65,6 +65,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const hiddenAtRef = useRef<number | null>(null)
 
   useEffect(() => {
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)')
+      const applySystemTheme = () => {
+        document.documentElement.setAttribute('data-theme', mq.matches ? 'dark' : 'light')
+      }
+      applySystemTheme()
+      mq.addEventListener('change', applySystemTheme)
+      return () => mq.removeEventListener('change', applySystemTheme)
+    }
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 

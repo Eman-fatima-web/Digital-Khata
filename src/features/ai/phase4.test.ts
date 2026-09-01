@@ -36,12 +36,12 @@ describe('Phase 4: Offline AI Fallback', () => {
     const data = makeSnapshot({
       customers: [ahmed],
       udhaar: [{
-        id: 'u1', customerId: 'c1', userId: 'u', shopId: 's',
+        id: 'u1', userId: 'u', shopId: 's', customerId: 'c1',
         amount: 5000, paidAmount: 0, remainingAmount: 5000,
         description: 'Test', createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('Ahmed Khan ka balance batao', data, 'en')
+    const result = runEngine('Ahmed Khan balance', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer') {
       expect(result.text).toContain('Ahmed Khan')
@@ -50,7 +50,7 @@ describe('Phase 4: Offline AI Fallback', () => {
   })
 
   it('handles navigation offline', () => {
-    const result = runEngine('customers kholo', makeSnapshot(), 'en')
+    const result = runEngine('open customers', makeSnapshot(), 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('NAVIGATE')
@@ -59,7 +59,7 @@ describe('Phase 4: Offline AI Fallback', () => {
   })
 
   it('handles theme change offline', () => {
-    const result = runEngine('theme dark kar do', makeSnapshot(), 'en')
+    const result = runEngine('theme dark', makeSnapshot(), 'en')
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.kind).toBe('SET_THEME')
@@ -80,23 +80,22 @@ describe('Phase 4: Offline AI Fallback', () => {
 
 describe('Phase 4: Multilingual Intent Detection', () => {
   it('detects English intents', () => {
-    expect(detectIntent('customers kholo')).toBe('NAVIGATE')
-    expect(detectIntent('reports dikhao')).toBe('NAVIGATE')
+    expect(detectIntent('open customers')).toBe('NAVIGATE')
+    expect(detectIntent('open reports')).toBe('NAVIGATE')
     expect(detectIntent('hello')).toBe('GREETING')
     expect(detectIntent('help')).toBe('HELP')
   })
 
-  it('detects Roman Urdu intents', () => {
-    expect(detectIntent('customers kholo')).toBe('NAVIGATE')
-    expect(detectIntent('reports dikhao')).toBe('NAVIGATE')
-    expect(detectIntent('salam')).toBe('GREETING')
-    expect(detectIntent('madad')).toBe('HELP')
-    expect(detectIntent('theme light kar do')).toBe('SET_THEME')
+  it('detects Urdu script intents', () => {
+    expect(detectIntent('گاہک کھولو')).toBe('NAVIGATE')
+    expect(detectIntent('رپورٹ دکھاؤ')).toBe('NAVIGATE')
+    expect(detectIntent('سلام')).toBe('GREETING')
+    expect(detectIntent('مدد')).toBe('HELP')
+    expect(detectIntent('تھیم light')).toBe('SET_THEME')
   })
 
   it('detects Urdu script greetings', () => {
-    // Note: Urdu script detection depends on normalization
-    expect(detectIntent('salam')).toBe('GREETING')
+    expect(detectIntent('السلام علیکم')).toBe('GREETING')
   })
 })
 
@@ -113,7 +112,7 @@ describe('Phase 4: Business Intelligence Queries', () => {
         createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('is week ki sales kitni hui', data, 'en')
+    const result = runEngine('this week sales', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer') {
       expect(result.text).toContain('5,000')
@@ -129,7 +128,7 @@ describe('Phase 4: Business Intelligence Queries', () => {
         createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('is month ki sales', data, 'en')
+    const result = runEngine('this month sales', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer') {
       expect(result.text).toContain('10,000')
@@ -152,7 +151,7 @@ describe('Phase 4: Business Intelligence Queries', () => {
         },
       ],
     })
-    const result = runEngine('10000 se zyada balance kis ka hai', data, 'en')
+    const result = runEngine('high balance customers', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer') {
       expect(result.text).toContain('Ahmed')
@@ -170,7 +169,7 @@ describe('Phase 4: Business Intelligence Queries', () => {
         createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('Ahmed ko aur udhaar dena chahiye', data, 'en')
+    const result = runEngine('Ahmed should I give more credit', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer') {
       expect(result.text).toContain('Ahmed')
@@ -183,14 +182,14 @@ describe('Phase 4: Business Intelligence Queries', () => {
 describe('Phase 4: Navigation Auto-Execution', () => {
   it('navigation proposals have correct paths', () => {
     const pages = [
-      { input: 'customers kholo', path: '/customers' },
-      { input: 'udhaar dikhao', path: '/udhaar' },
-      { input: 'payments kholo', path: '/payments' },
-      { input: 'sales dikhao', path: '/sales' },
-      { input: 'reports kholo', path: '/reports' },
-      { input: 'reminders dikhao', path: '/reminders' },
-      { input: 'settings kholo', path: '/settings' },
-      { input: 'dashboard dikhao', path: '/dashboard' },
+      { input: 'open customers', path: '/customers' },
+      { input: 'udhaar دکھاؤ', path: '/udhaar' },
+      { input: 'open payments', path: '/payments' },
+      { input: 'sales دکھاؤ', path: '/sales' },
+      { input: 'open reports', path: '/reports' },
+      { input: 'reminders دکھاؤ', path: '/reminders' },
+      { input: 'open settings', path: '/settings' },
+      { input: 'dashboard دکھاؤ', path: '/dashboard' },
     ]
     for (const { input, path } of pages) {
       const result = runEngine(input, makeSnapshot(), 'en')
@@ -208,12 +207,10 @@ describe('Phase 4: Data Isolation', () => {
     const ahmed = makeCustomer({ id: 'c1', name: 'Ahmed' })
     const data = makeSnapshot({ customers: [ahmed] })
 
-    // Query for Ahmed should work
-    const result1 = runEngine('Ahmed ka balance batao', data, 'en')
+    const result1 = runEngine('Ahmed balance', data, 'en')
     expect(result1.type).toBe('answer')
 
-    // Query for unknown customer returns totals (fallback behavior)
-    const result2 = runEngine('Unknown ka balance batao', data, 'en')
-    expect(result2.type).toBe('answer') // Falls back to totals when customer not found
+    const result2 = runEngine('Unknown balance', data, 'en')
+    expect(result2.type).toBe('answer')
   })
 })

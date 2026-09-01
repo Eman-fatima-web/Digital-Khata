@@ -64,7 +64,7 @@ export default function VerifyEmail() {
 
             {status === 'success' && (
               <>
-                <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+                <CheckCircle className="mx-auto h-12 w-12 text-success-500" />
                 <p className="text-lg font-medium text-ink">{t('auth.verifyEmail.success')}</p>
                 <Link
                   to="/login"

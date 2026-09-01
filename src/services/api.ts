@@ -243,6 +243,34 @@ export async function sendVerification(): Promise<{ sent: boolean }> {
 }
 
 /**
+ * Request a password reset email
+ */
+export async function forgotPassword(email: string): Promise<{ sent: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  return response.json()
+}
+
+/**
+ * Reset password using token from email link
+ */
+export async function resetPassword(
+  token: string,
+  userId: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, id: userId, password }),
+  })
+  return response.json()
+}
+
+/**
  * Get the API base URL
  */
 export function getApiBaseUrl(): string {

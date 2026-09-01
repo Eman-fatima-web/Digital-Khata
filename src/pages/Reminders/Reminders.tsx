@@ -90,7 +90,7 @@ function Reminders() {
 
   const todayStr = new Date().toLocaleDateString('en-CA')
 
-  const reminders = useMemo<ReminderItem[]>(() => {
+  const reminders: ReminderItem[] = (() => {
     const items: ReminderItem[] = []
 
     for (const entry of udhaar ?? []) {
@@ -126,19 +126,18 @@ function Reminders() {
       }
       return a.dueDate.localeCompare(b.dueDate)
     })
-  }, [udhaar, customerMap, todayStr])
+  })()
 
-  const filtered = useMemo(() => {
-    if (activeTab === 'all') return reminders.filter((r) => r.status !== 'upcoming' || r.days <= 7)
-    return reminders.filter((r) => r.status === activeTab)
-  }, [reminders, activeTab])
+  const filtered = activeTab === 'all'
+    ? reminders.filter((r) => r.status !== 'upcoming' || r.days <= 7)
+    : reminders.filter((r) => r.status === activeTab)
 
-  const totals = useMemo(() => {
+  const totals = (() => {
     const overdue = reminders.filter((r) => r.status === 'overdue').reduce((sum, r) => sum + r.amount, 0)
     const dueToday = reminders.filter((r) => r.status === 'dueToday').reduce((sum, r) => sum + r.amount, 0)
     const upcoming = reminders.filter((r) => r.status === 'upcoming').reduce((sum, r) => sum + r.amount, 0)
     return { overdue, dueToday, upcoming }
-  }, [reminders])
+  })()
 
   if (customers === undefined || udhaar === undefined) {
     return <PageLoader />

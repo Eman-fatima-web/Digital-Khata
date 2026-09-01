@@ -9,6 +9,8 @@ import { useApp } from '../hooks/useApp'
 const Login = lazy(() => import('../pages/Auth/Login'))
 const Register = lazy(() => import('../pages/Auth/Register'))
 const VerifyEmail = lazy(() => import('../pages/Auth/VerifyEmail'))
+const ForgotPassword = lazy(() => import('../pages/Auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'))
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('../pages/Customers/Customers'))
 const CustomerDetail = lazy(() => import('../pages/Customers/CustomerDetail'))
@@ -23,6 +25,7 @@ const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
 const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
 const Trash = lazy(() => import('../pages/Trash/Trash'))
 const Settings = lazy(() => import('../pages/Settings/Settings'))
+const AuditLog = lazy(() => import('../pages/AuditLog/AuditLog'))
 
 function App() {
   const { isLocked } = useApp()
@@ -33,6 +36,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           element={
@@ -55,6 +60,7 @@ function App() {
           <Route path="/conflicts" element={<Conflicts />} />
           <Route path="/trash" element={<Trash />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/audit-log" element={<AuditLog />} />
         </Route>
       </Routes>
     </BrowserRouter>

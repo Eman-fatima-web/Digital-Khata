@@ -1,4 +1,4 @@
-import { Moon, Sun, RefreshCw, Wifi, WifiOff, AlertCircle, Lock } from 'lucide-react'
+import { RefreshCw, Wifi, WifiOff, AlertCircle, Lock } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
 import { useNetwork } from '../../hooks/useNetwork'
@@ -7,10 +7,9 @@ import { useSyncConflictCount } from '../../hooks/useKhataData'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../../core/i18n'
 import { cn } from '../../lib/utils'
-import { LanguageSwitcher } from '../../components/ui/LanguageSwitcher'
 
 export function Header() {
-  const { theme, toggleTheme, pinEnabled, lock } = useApp()
+  const { pinEnabled, lock } = useApp()
   const isOnline = useNetwork()
   const { state: syncState, sync } = useSync()
   const { t } = useTranslation()
@@ -84,8 +83,6 @@ export function Header() {
             <span className="hidden sm:inline">{statusConfig.label}</span>
           </button>
 
-          <LanguageSwitcher />
-
           {pinEnabled && (
             <button
               onClick={lock}
@@ -96,14 +93,6 @@ export function Header() {
               <Lock size={16} />
             </button>
           )}
-
-          <button
-            onClick={toggleTheme}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-surface-hairline bg-surface-card text-ink-muted transition hover:text-ink"
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
         </div>
       </div>
     </header>

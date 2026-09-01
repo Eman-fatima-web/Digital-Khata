@@ -2,15 +2,10 @@ import type { Customer, Payment } from '../../core/types'
 import { localDateKey } from '../../lib/utils'
 
 const STOPWORDS = new Set([
-  'ka', 'ki', 'ko', 'ke', 'kya', 'kyu', 'kyun', 'hai', 'hain', 'hy', 'he', 'ha',
-  'mera', 'meri', 'mere', 'mujhe', 'aap', 'ap', 'main', 'mein', 'me', 'se', 'ne',
-  'kon', 'kaun', 'kis', 'kisko', 'jo', 'to', 'bhi', 'hi', 'tha', 'thi', 'the',
-  'hoga', 'hogi', 'reha', 'reh', 'gaya', 'gayi', 'gayy', 'kar', 'karo', 'karlo',
-  'krl', 'krlo', 'kro', 'liye', 'nein', 'kiya', 'kijiye',
   'who', 'whos', 'owes', 'owe', 'the', 'a', 'an', 'of', 'to', 'in', 'for', 'is',
   'are', 'was', 'were', 'my', 'i', 'show', 'tell', 'give', 'what', 'how', 'much',
   'many', 'please', 'and', 'on', 'at', 'do', 'does', 'did', 'has', 'have', 'can',
-  'you', 'me', 'payment', 'receive', 'received', 'udhaar', 'udhar', 'balance',
+  'you', 'me', 'payment', 'receive', 'received', 'udhaar', 'balance',
   'ادا', 'ادائیگی', 'کی', 'کا', 'کے', 'کو', 'ہے', 'ہیں', 'میں', 'سے', 'نے', 'اور',
   'کر', 'کرو', 'کردو', 'کرلو', 'براہ', 'مہربانی', 'رقم', 'روپے', 'روپیہ', 'ہزار', 'لاکھ',
 ])
@@ -24,7 +19,7 @@ const URDU_CHARACTER_MAP: Record<string, string> = {
   'ي': 'ی', 'ى': 'ی', 'ك': 'ک', 'ۀ': 'ہ', 'ة': 'ہ', 'ھ': 'ہ', 'ؤ': 'و', 'ئ': 'ی',
 }
 
-/** Normalizes English, Roman Urdu, and Urdu-script input without a network service. */
+/** Normalizes English and Urdu-script input without a network service. */
 export function normalize(input: string): string {
   return Array.from(input.normalize('NFKC').toLowerCase(), (character) =>
     DIGIT_MAP[character] ?? URDU_CHARACTER_MAP[character] ?? character,
@@ -44,20 +39,8 @@ export type CustomerMatch =
   | { status: 'ambiguous'; candidates: Customer[] }
   | { status: 'none' }
 
-const URDU_ROMAN_MAP: Record<string, string> = {
-  'ا': 'a', 'آ': 'aa', 'ب': 'b', 'پ': 'p', 'ت': 't', 'ٹ': 't', 'ث': 's', 'ج': 'j', 'چ': 'ch',
-  'ح': 'h', 'خ': 'kh', 'د': 'd', 'ڈ': 'd', 'ذ': 'z', 'ر': 'r', 'ڑ': 'r', 'ز': 'z', 'ژ': 'zh',
-  'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'z', 'ط': 't', 'ظ': 'z', 'ع': '', 'غ': 'gh', 'ف': 'f',
-  'ق': 'q', 'ک': 'k', 'گ': 'g', 'ل': 'l', 'م': 'm', 'ن': 'n', 'و': 'w', 'ہ': 'h', 'ء': '',
-  'ی': 'y', 'ے': 'e', 'ں': 'n',
-}
-
-function romanize(value: string): string {
-  return Array.from(normalize(value), (character) => URDU_ROMAN_MAP[character] ?? character).join('')
-}
-
 function comparable(value: string): string {
-  return romanize(value)
+  return normalize(value)
     .replace(/ph/g, 'f')
     .replace(/q/g, 'k')
     .replace(/v/g, 'w')
@@ -139,11 +122,6 @@ const WORD_NUMBERS: Record<string, number> = {
   ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
   sixty: 60, seventy: 70, eighty: 80, ninety: 90,
-  ek: 1, aik: 1, do: 2, teen: 3, char: 4, chaar: 4, panch: 5, paanch: 5, chhe: 6, che: 6,
-  chay: 6, sat: 7, saat: 7, aath: 8, ath: 8, nau: 9, das: 10, gyarah: 11,
-  gyaara: 11, barah: 12, terah: 13, chaudah: 14, pandrah: 15, solah: 16, satrah: 17,
-  atharah: 18, unnis: 19, bees: 20, tees: 30, chalis: 40, pachas: 50, saath: 60,
-  sattar: 70, assi: 80, nabbe: 90,
   'صفر': 0, 'ایک': 1, 'دو': 2, 'تین': 3, 'چار': 4, 'پانچ': 5, 'چھ': 6, 'سات': 7, 'آٹھ': 8,
   'نو': 9, 'دس': 10, 'گیارہ': 11, 'بارہ': 12, 'تیرہ': 13, 'چودہ': 14, 'پندرہ': 15,
   'سولہ': 16, 'سترہ': 17, 'اٹھارہ': 18, 'انیس': 19, 'بیس': 20, 'تیس': 30, 'چالیس': 40,
@@ -151,10 +129,10 @@ const WORD_NUMBERS: Record<string, number> = {
 }
 
 const MULTIPLIERS: Record<string, number> = {
-  hundred: 100, sau: 100, soo: 100, 'سو': 100,
-  thousand: 1000, hazar: 1000, hajar: 1000, hazaar: 1000, 'ہزار': 1000,
-  lakh: 100000, lac: 100000, lak: 100000, 'لاکھ': 100000,
-  crore: 10000000, karor: 10000000, 'کروڑ': 10000000,
+  hundred: 100, 'سو': 100,
+  thousand: 1000, 'ہزار': 1000,
+  lakh: 100000, 'لاکھ': 100000,
+  crore: 10000000, 'کروڑ': 10000000,
 }
 
 function parseNumeric(token: string): number | undefined {
@@ -178,7 +156,7 @@ function parseWordAmount(tokens: string[], start: number): number | undefined {
     else if (multiplier !== undefined && consumed) {
       current = Math.max(current, 1) * multiplier
       if (multiplier >= 1000) { total += current; current = 0 }
-    } else if (consumed && (token === 'and' || token === 'aur' || token === 'اور')) {
+    } else if (consumed && (token === 'and' || token === 'اور')) {
       continue
     } else break
   }
@@ -208,9 +186,9 @@ export type Period = 'today' | 'week' | 'month'
 
 export function detectPeriod(input: string): Period {
   const norm = normalize(input)
-  if (/\btoday\b|\baaj\b|\baj\b|آج/.test(norm)) return 'today'
-  if (/\bweek\b|\bhafte?\b|\bhaftey\b|ہفت[ےہ]/.test(norm)) return 'week'
-  if (/\bmonth\b|\bmahine?\b|\bmahina\b|\bmahiney\b|مہین[ےہ]/.test(norm)) return 'month'
+  if (/\btoday\b|آج/.test(norm)) return 'today'
+  if (/\bweek\b|ہفت[ےہ]/.test(norm)) return 'week'
+  if (/\bmonth\b|مہین[ےہ]/.test(norm)) return 'month'
   return 'month'
 }
 
@@ -233,10 +211,8 @@ export function isInPeriod(dateStr: string, period: Period): boolean {
 export function localToday(): string { return localDateKey() }
 
 const PRONOUNS = [
-  'us ne', 'us ko', 'us ka', 'us ki', 'uske', 'uski', 'uska', 'usse',
-  'woh', 'wo', 'ye', 'yeh', 'inhone', 'inho ne', 'inhon ne', 'unko', 'unki', 'unka',
   'him', 'her', 'them', 'he', 'she', 'it', 'they',
-  'that customer', 'the same', 'same customer', 'usko', 'usne',
+  'that customer', 'the same', 'same customer',
   'اس نے', 'اس کو', 'اس کا', 'اس کی', 'وہ', 'یہ', 'انہوں نے', 'ان کو',
 ]
 
@@ -246,10 +222,11 @@ export function detectPronoun(input: string): boolean {
 }
 
 const CUSTOMER_ACTION_PATTERNS = [
-  /\b(?:naya|nayi|new|add|create|banao|banado|banai|bana)\s+(?:customer|gahak|گاہک|customer)/i,
-  /\b(?:customer|gahak|گاہک)\s+(?:add|create|banao|banado|banai|bana|naya|nayi|new)/i,
-  /\bنیا\s+گاہک\b/,
-  /\bگاہک\s+(?:بنائ|بناؤ|شامل)\b/,
+  /\b(?:new|add|create)\s+(?:customer|گاہک)/i,
+  /\b(?:customer)\s+(?:add|create|new)/i,
+  /گاہک\s+(?:add|create|new)/i,
+  /نیا\s+گاہک/,
+  /گاہک\s+(?:بنائ|بناؤ|شامل)/,
 ]
 
 export function detectNewCustomer(input: string): { name: string; phone?: string } | undefined {
@@ -258,7 +235,7 @@ export function detectNewCustomer(input: string): { name: string; phone?: string
   if (!isCustomerAction) return undefined
 
   const tokens = norm.split(/\s+/).filter((token) => token && !STOPWORDS.has(token))
-  const actionWords = new Set(['naya', 'nayi', 'new', 'add', 'create', 'banao', 'banado', 'banai', 'bana', 'customer', 'gahak', 'نیا', 'گاہک'])
+  const actionWords = new Set(['new', 'add', 'create', 'customer', 'نیا', 'گاہک'])
   const nameTokens = tokens.filter((token) => !actionWords.has(token) && !/^\d+$/.test(token))
 
   if (nameTokens.length === 0) return undefined
@@ -270,11 +247,11 @@ export function detectNewCustomer(input: string): { name: string; phone?: string
 }
 
 const GREETING_PATTERNS = [
-  /\b(?:assalam|salam|slm|hello|hi|hey|good\s*(?:morning|afternoon|evening)|aoa)\b/i,
-  /\bسلام\b/,
-  /\bالسلام\s+علیکم\b/,
-  /\bآداب\b/,
-  /\bہیلو\b/,
+  /\b(?:hello|hi|hey|good\s*(?:morning|afternoon|evening))\b/i,
+  /سلام/,
+  /السلام\s+علیکم/,
+  /آداب/,
+  /ہیلو/,
 ]
 
 export function detectGreeting(input: string): boolean {
@@ -284,7 +261,6 @@ export function detectGreeting(input: string): boolean {
 
 const NEGATION_TERMS = [
   "don't", 'dont', 'do not', 'never', 'no', 'stop', 'cancel',
-  'mat', 'mato', 'nahi', 'nahi', 'nahin', 'na', 'mat karo',
   'نہیں', 'مت', 'نہ', 'مت کرو',
 ]
 
@@ -293,7 +269,6 @@ export function detectNegation(input: string): boolean {
   return NEGATION_TERMS.some((term) => {
     const normalizedTerm = normalize(term)
     if (!normalizedTerm) return false
-    if (normalizedTerm.length <= 2) return new RegExp(`\\b${normalizedTerm}\\b`).test(norm)
     return norm.includes(normalizedTerm)
   })
 }
@@ -301,23 +276,23 @@ export function detectNegation(input: string): boolean {
 const EXTENDED_PERIODS: Array<{ key: ExpandedPeriod; patterns: RegExp[] }> = [
   {
     key: 'yesterday',
-    patterns: [/\byesterday\b/, /\bkal\b/, /کل/],
+    patterns: [/\byesterday\b/, /کل/],
   },
   {
     key: 'last_week',
-    patterns: [/\blast\s*week\b/, /\bpichle?\s*hafte?\b/, /پچھلے\s*ہفتے/],
+    patterns: [/\blast\s*week\b/, /پچھلے\s*ہفتے/],
   },
   {
     key: 'last_month',
-    patterns: [/\blast\s*month\b/, /\bpichle?\s*mahine?\b/, /پچھلے\s*مہینے/],
+    patterns: [/\blast\s*month\b/, /پچھلے\s*مہینے/],
   },
   {
     key: 'last_7_days',
-    patterns: [/\bpast\s*7\s*days?\b/, /\blast\s*7\s*days?\b/, /\bpichle?\s*7\s*din\b/],
+    patterns: [/\bpast\s*7\s*days?\b/, /\blast\s*7\s*days?\b/],
   },
   {
     key: 'last_30_days',
-    patterns: [/\bpast\s*30\s*days?\b/, /\blast\s*30\s*days?\b/, /\bpichle?\s*30\s*din\b/],
+    patterns: [/\bpast\s*30\s*days?\b/, /\blast\s*30\s*days?\b/],
   },
 ]
 
@@ -328,9 +303,9 @@ export function detectExpandedPeriod(input: string): ExpandedPeriod {
   for (const entry of EXTENDED_PERIODS) {
     if (entry.patterns.some((p) => p.test(norm))) return entry.key
   }
-  if (/\bweek\b|\bhafte?\b|ہفت[ےہ]/.test(norm)) return 'week'
-  if (/\bmonth\b|\bmahine?\b|\bmahina\b|مہین[ےہ]/.test(norm)) return 'month'
-  if (/\btoday\b|\baaj\b|آج/.test(norm)) return 'today'
+  if (/\bweek\b|ہفت[ےہ]/.test(norm)) return 'week'
+  if (/\bmonth\b|مہین[ےہ]/.test(norm)) return 'month'
+  if (/\btoday\b|آج/.test(norm)) return 'today'
   return 'month'
 }
 
@@ -369,7 +344,7 @@ export function isInExpandedPeriod(dateStr: string, period: ExpandedPeriod): boo
   return date >= start && date < end
 }
 
-const SPLIT_PATTERN = /\b(?:and|aur|phir|bhi)\b|اور|پھر|اور\s|،|,/
+const SPLIT_PATTERN = /\band\b|اور|پھر|اور\s|،|,/
 
 export function splitCompoundInput(input: string): string[] {
   const parts = input.split(SPLIT_PATTERN).map((part) => part.trim()).filter(Boolean)

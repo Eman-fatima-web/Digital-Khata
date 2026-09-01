@@ -16,6 +16,8 @@ import {
   CheckCircle,
   AlertCircle,
   Cpu,
+  Download,
+  Upload,
 } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
@@ -26,6 +28,7 @@ import { useNotificationPreferences } from '../../hooks/useNotificationPreferenc
 import { useAIProvider, fetchOllamaHealth, type OllamaHealthStatus } from '../../hooks/useAIProvider'
 import { clearPin, setPin, verifyPin } from '../../security/pin'
 import { clearAllConversations } from '../../data/repositories/conversationRepo'
+import { exportBackup, downloadBackup, importBackup } from '../../data/services/backupService'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
@@ -45,7 +48,7 @@ function SectionHeader({ children }: { children: string }) {
 
 function Settings() {
   const { t } = useTranslation()
-  const { pinEnabled, setPinEnabled, lock, theme, toggleTheme } = useApp()
+  const { pinEnabled, setPinEnabled, lock, theme, setTheme, toggleTheme } = useApp()
   const { isAuthenticated, user, logout, sendVerification } = useAuth()
   const owner = useOwner()
   const { prefs, updatePrefs } = useNotificationPreferences()
@@ -192,6 +195,39 @@ function Settings() {
     showToast('success', t('settings.historyCleared'))
   }
 
+  const handleExportBackup = async () => {
+    try {
+      const json = await exportBackup()
+      downloadBackup(json)
+      showToast('success', t('settings.backupExported'))
+    } catch {
+      showToast('error', t('common.error'))
+    }
+  }
+
+  const handleImportBackup = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,application/json'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (!window.confirm(t('settings.backupImportConfirm'))) return
+      try {
+        const text = await file.text()
+        const result = await importBackup(text)
+        if (result.success) {
+          showToast('success', t('settings.backupRestored'))
+        } else {
+          showToast('error', result.error || t('common.error'))
+        }
+      } catch {
+        showToast('error', t('common.error'))
+      }
+    }
+    input.click()
+  }
+
   const handleSendVerification = async () => {
     try {
       await sendVerification()
@@ -272,24 +308,20 @@ function Settings() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm font-semibold text-ink">
-                {theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
-              </p>
-              <button
-                role="switch"
-                aria-checked={theme === 'dark'}
-                onClick={toggleTheme}
-                className={`relative h-7 w-12 rounded-full transition ${
-                  theme === 'dark' ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    theme === 'dark' ? 'start-6' : 'start-1'
+            <div className="flex gap-2">
+              {(['light', 'dark', 'system'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    theme === t
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-surface-raised text-ink-muted hover:bg-surface-border'
                   }`}
-                />
-              </button>
+                >
+                  {t === 'light' ? '☀️ Light' : t === 'dark' ? '🌙 Dark' : '💻 System'}
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -334,16 +366,16 @@ function Settings() {
               { key: 'emailReports' as const, label: t('settings.emailReports'), desc: t('settings.emailReportsDesc') },
             ]).map((item) => (
               <div key={item.key} className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-ink">{item.label}</p>
-                  <p className="text-xs text-ink-muted">{item.desc}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{item.label}</p>
+                  <p className="truncate text-xs text-ink-muted">{item.desc}</p>
                 </div>
                 <button
                   role="switch"
                   aria-checked={prefs[item.key]}
                   onClick={() => updatePrefs({ [item.key]: !prefs[item.key] })}
                   className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                    prefs[item.key] ? 'bg-primary-500' : 'bg-ink-subtle/40'
+                    prefs[item.key] ? 'bg-primary-500' : 'bg-surface-border'
                   }`}
                 >
                   <span
@@ -522,6 +554,29 @@ function Settings() {
       {/* Data Management Section */}
       <section className="space-y-3">
         <SectionHeader>{t('settings.dataManagementSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600">
+              <Download size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.backupRestore')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.backupRestoreDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportBackup}>
+                <Download size={15} />
+                {t('settings.exportBackup')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleImportBackup}>
+                <Upload size={15} />
+                {t('settings.importBackup')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">

@@ -16,6 +16,8 @@ type LocalUser = {
   emailVerified: boolean
   verificationToken?: string
   verificationTokenExpiry?: string
+  passwordResetToken?: string
+  passwordResetTokenExpiry?: string
   createdAt: string
 }
 
@@ -100,6 +102,33 @@ export function verifyEmailToken(userId: string, token: string): boolean {
   user.emailVerified = true
   delete user.verificationToken
   delete user.verificationTokenExpiry
+  saveStore(store)
+  return true
+}
+
+export function setResetToken(userId: string, token: string, expiry: string): void {
+  const store = loadStore()
+  const user = store.users.find((u) => u.id === userId)
+  if (!user) throw new Error('User not found')
+  user.passwordResetToken = createHash('sha256').update(token).digest('hex')
+  user.passwordResetTokenExpiry = expiry
+  saveStore(store)
+}
+
+export async function resetPasswordWithToken(
+  userId: string,
+  token: string,
+  newPassword: string
+): Promise<boolean> {
+  const store = loadStore()
+  const user = store.users.find((u) => u.id === userId)
+  if (!user || !user.passwordResetToken || !user.passwordResetTokenExpiry) return false
+  if (new Date(user.passwordResetTokenExpiry) < new Date()) return false
+  const hashedToken = createHash('sha256').update(token).digest('hex')
+  if (hashedToken !== user.passwordResetToken) return false
+  user.passwordHash = await bcrypt.hash(newPassword, 10)
+  delete user.passwordResetToken
+  delete user.passwordResetTokenExpiry
   saveStore(store)
   return true
 }

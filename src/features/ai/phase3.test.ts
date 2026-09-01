@@ -54,11 +54,11 @@ describe('Phase 3: Multi-Turn Conversation Context', () => {
     const context = createEmptyContext()
     const data = makeSnapshot([ahmed])
 
-    const { updatedContext: ctx1 } = await processInput('Ahmed Khan ka balance batao', context, data, 'en', true)
+    const { updatedContext: ctx1 } = await processInput('Ahmed Khan balance', context, data, 'en', true)
     expect(ctx1.activeCustomerName).toBe('Ahmed Khan')
 
-    // Second turn with pronoun should resolve to Ahmed and trigger payment intent
-    const { result } = await processInput('us ki 2000 payment receive karo', ctx1, data, 'en', true)
+    // Second turn should resolve to Ahmed and trigger payment intent
+    const { result } = await processInput('receive 2000 payment', ctx1, data, 'en', true)
     expect(result.type).toBe('proposal')
     if (result.type === 'proposal') {
       expect(result.proposal.customerName).toBe('Ahmed Khan')
@@ -88,33 +88,30 @@ describe('Phase 3: Multi-Turn Conversation Context', () => {
 
 describe('Phase 3: New Business Intents', () => {
   it('detects weekly sales intent', () => {
-    expect(detectIntent('is week ki sales kitni hui')).toBe('WEEKLY_SALES')
     expect(detectIntent('this week sales')).toBe('WEEKLY_SALES')
+    expect(detectIntent('weekly sales')).toBe('WEEKLY_SALES')
   })
 
   it('detects monthly sales intent', () => {
-    expect(detectIntent('is month ki sales')).toBe('MONTHLY_SALES')
     expect(detectIntent('this month sales')).toBe('MONTHLY_SALES')
+    expect(detectIntent('monthly sales')).toBe('MONTHLY_SALES')
   })
 
   it('detects yesterday sales intent', () => {
-    expect(detectIntent('kal ki sales kitni hui')).toBe('YESTERDAY_SALES')
     expect(detectIntent('yesterday sales')).toBe('YESTERDAY_SALES')
   })
 
   it('detects high balance customers intent', () => {
-    expect(detectIntent('10000 se zyada balance kis ka hai')).toBe('HIGH_BALANCE_CUSTOMERS')
     expect(detectIntent('high balance customers')).toBe('HIGH_BALANCE_CUSTOMERS')
   })
 
   it('detects late payer intent', () => {
-    expect(detectIntent('kaun regularly late payment karta hai')).toBe('LATE_PAYER')
-    expect(detectIntent('late karta hai')).toBe('LATE_PAYER')
+    expect(detectIntent('regularly late payment')).toBe('LATE_PAYER')
+    expect(detectIntent('late payer')).toBe('LATE_PAYER')
   })
 
   it('detects credit advice intent', () => {
-    expect(detectIntent('Ahmed ko aur udhaar dena chahiye')).toBe('CREDIT_ADVICE')
-    expect(detectIntent('kya Ahmed ko credit doon')).toBe('CREDIT_ADVICE')
+    expect(detectIntent('اور ادھار')).toBe('CREDIT_ADVICE')
   })
 })
 
@@ -166,7 +163,7 @@ describe('Phase 3: Prompt Injection Defense', () => {
   })
 
   it('creates system boundary', () => {
-    const boundary = createSystemBoundary('Ahmed ka balance', 'Customer data here')
+    const boundary = createSystemBoundary('Ahmed balance', 'Customer data here')
     expect(boundary).toContain('SYSTEM INSTRUCTIONS')
     expect(boundary).toContain('USER REQUEST')
     expect(boundary).toContain('BUSINESS DATA')
