@@ -45,7 +45,7 @@ describe('Pagination Hooks Performance', () => {
       expect(result.current.items).toBeDefined()
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      expect(result.current.nextCursor).toBeDefined()
+      expect(result.current.total).toBe(1000)
 
       // Verify items are sorted by name
       const names = result.current.items?.map((c) => c.name) ?? []
@@ -53,7 +53,7 @@ describe('Pagination Hooks Performance', () => {
       expect(names).toEqual(sortedNames)
     })
 
-    it('loads next page using cursor', async () => {
+    it('loads next page using page navigation', async () => {
       // Generate 150 customers
       const customers: Customer[] = Array.from({ length: 150 }, (_, i) => ({
         id: generateId(),
@@ -71,9 +71,8 @@ describe('Pagination Hooks Performance', () => {
       await db.customers.bulkAdd(customers)
 
       // Load first page
-      const { result, rerender } = renderHook(
-        ({ cursor }) => useCustomersPaginated({ pageSize: 50, cursor }),
-        { initialProps: { cursor: undefined as string | undefined } }
+      const { result } = renderHook(() =>
+        useCustomersPaginated({ pageSize: 50 })
       )
 
       await waitFor(() => {
@@ -83,13 +82,17 @@ describe('Pagination Hooks Performance', () => {
       expect(result.current.items).toBeDefined()
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      const firstPageCursor = result.current.nextCursor
+      expect(result.current.page).toBe(0)
 
-      // Load second page using cursor
-      rerender({ cursor: firstPageCursor })
+      // Navigate to second page
+      result.current.nextPage()
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
+      })
+
+      await waitFor(() => {
+        expect(result.current.page).toBe(1)
       })
 
       expect(result.current.items).toBeDefined()
@@ -315,7 +318,6 @@ describe('Pagination Hooks Performance', () => {
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      expect(result.current.nextCursor).toBeDefined()
       expect(result.current.total).toBe(10000)
     }, 30000)
 

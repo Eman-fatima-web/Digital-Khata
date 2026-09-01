@@ -11,12 +11,15 @@ import {
   ChevronRight,
   MessageSquare,
   Check,
+  SendHorizontal,
 } from 'lucide-react'
 
 import { useCustomers, useUdhaar } from '../../hooks/useKhataData'
 import { useTranslation } from '../../core/i18n'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import { notificationService } from '../../data/services/notificationService'
+import { sendOverdueReminders } from '../../services/api'
+import { useNetwork } from '../../hooks/useNetwork'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -43,9 +46,38 @@ function Reminders() {
   const [notificationPermission, setNotificationPermission] = useState(() =>
     notificationService.getPermission(),
   )
+  const [batchSending, setBatchSending] = useState(false)
+  const [batchResult, setBatchResult] = useState<{ sent: number; failed: number } | null>(null)
+  const isOnline = useNetwork()
 
   const handleEnableNotifications = async () => {
     setNotificationPermission(await notificationService.requestPermission())
+  }
+
+  const handleSendAllReminders = async () => {
+    const overdueItems = reminders.filter((r) => r.status === 'overdue')
+    if (overdueItems.length === 0) return
+
+    if (!isOnline) {
+      for (const item of overdueItems) {
+        handleSendReminder(item)
+      }
+      return
+    }
+
+    setBatchSending(true)
+    setBatchResult(null)
+    try {
+      const result = await sendOverdueReminders()
+      setBatchResult({ sent: result.sent, failed: result.failed })
+    } catch {
+      for (const item of overdueItems) {
+        handleSendReminder(item)
+      }
+      setBatchResult({ sent: 0, failed: overdueItems.length })
+    } finally {
+      setBatchSending(false)
+    }
   }
 
   const customers = useCustomers()
@@ -202,6 +234,16 @@ function Reminders() {
                 {t('reminders.enableNotifications')}
               </Button>
             )}
+            {reminders.filter((r) => r.status === 'overdue').length > 0 && (
+              <Button
+                variant="primary"
+                onClick={() => void handleSendAllReminders()}
+                disabled={batchSending}
+              >
+                <SendHorizontal size={16} />
+                {batchSending ? t('reminders.sendingReminders') : t('reminders.sendAllReminders')}
+              </Button>
+            )}
             <Button variant="outline" onClick={() => navigate('/reports')}>
               {t('nav.reports')}
               <ChevronRight size={16} />
@@ -209,6 +251,19 @@ function Reminders() {
           </div>
         </div>
       </section>
+
+      {batchResult && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${
+          batchResult.failed === 0
+            ? 'border-success-200 bg-success-50 text-success-700'
+            : 'border-danger-200 bg-danger-50 text-danger-700'
+        }`}>
+          {batchResult.failed === 0
+            ? `${t('reminders.remindersSent')} (${batchResult.sent})`
+            : `${t('reminders.remindersFailed')} — ${batchResult.sent} sent, ${batchResult.failed} failed`
+          }
+        </div>
+      )}
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tabs.map((tab) => {

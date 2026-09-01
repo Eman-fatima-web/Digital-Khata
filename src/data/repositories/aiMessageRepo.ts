@@ -1,6 +1,8 @@
 import type { AIMessage } from '../../core/types'
 import { db } from '../db/db'
 
+const MAX_HISTORY = 500
+
 export async function addAIMessage(message: AIMessage): Promise<void> {
   await db.aiMessages.add(message)
 }
@@ -20,10 +22,12 @@ export async function getAIMessageHistory(
     return db.aiMessages
       .where({ conversationId })
       .sortBy('createdAt')
+      .then((msgs) => msgs.slice(-MAX_HISTORY))
   }
   return db.aiMessages
     .where({ userId: owner.userId, shopId: owner.shopId })
     .sortBy('createdAt')
+    .then((msgs) => msgs.slice(-MAX_HISTORY))
 }
 
 export async function clearAIMessageHistory(

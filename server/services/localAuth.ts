@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import bcrypt from 'bcrypt'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { createChildLogger } from './logger.js'
 
 const log = createChildLogger({ module: 'local-auth' })
@@ -85,7 +85,7 @@ export function setVerificationToken(userId: string, token: string, expiry: stri
   const store = loadStore()
   const user = store.users.find((u) => u.id === userId)
   if (!user) throw new Error('User not found')
-  user.verificationToken = token
+  user.verificationToken = createHash('sha256').update(token).digest('hex')
   user.verificationTokenExpiry = expiry
   saveStore(store)
 }
@@ -95,7 +95,8 @@ export function verifyEmailToken(userId: string, token: string): boolean {
   const user = store.users.find((u) => u.id === userId)
   if (!user || !user.verificationToken || !user.verificationTokenExpiry) return false
   if (new Date(user.verificationTokenExpiry) < new Date()) return false
-  if (user.verificationToken !== token) return false
+  const hashedToken = createHash('sha256').update(token).digest('hex')
+  if (hashedToken !== user.verificationToken) return false
   user.emailVerified = true
   delete user.verificationToken
   delete user.verificationTokenExpiry

@@ -44,6 +44,7 @@
   --color-surface-card: #FFFFFF;
   --color-surface-hover: #EDF2ED;
   --color-surface-hairline: #E3EEE7;
+  --color-surface-border: #D1DDD5;
 
   /* Semantic */
   --color-danger: #DC2626;
@@ -56,12 +57,13 @@
   --color-ink: #F1F5F9 !important;
   --color-ink-light: #CBD5E1 !important;
   --color-ink-muted: #94A3B8 !important;
-  --color-ink-subtle: #64748B !important;
+  --color-ink-subtle: #7C8CA3 !important;
 
   --color-surface: #0F172A !important;
   --color-surface-card: #1E293B !important;
   --color-surface-hover: #283548 !important;
   --color-surface-hairline: #334155 !important;
+  --color-surface-border: #334155 !important;
 
   --color-primary-500: #14B8A6 !important;
   --color-primary-600: #2DD4BF !important;

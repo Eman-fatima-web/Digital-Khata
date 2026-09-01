@@ -179,5 +179,10 @@ export type Conversation = {
 
 export type NotificationPreferences = {
   dailySalesSummary: boolean
+  weeklySalesSummary: boolean
+  monthlySalesSummary: boolean
   paymentReminders: boolean
+  whatsappReminders: boolean
+  smsReminders: boolean
+  emailReports: boolean
 }

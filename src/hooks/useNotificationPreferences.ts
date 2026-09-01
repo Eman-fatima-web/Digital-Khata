@@ -5,7 +5,12 @@ import { STORAGE_KEYS } from '../core/config/constants'
 
 const DEFAULT_PREFS: NotificationPreferences = {
   dailySalesSummary: true,
+  weeklySalesSummary: true,
+  monthlySalesSummary: true,
   paymentReminders: true,
+  whatsappReminders: true,
+  smsReminders: true,
+  emailReports: true,
 }
 
 function loadPrefs(): NotificationPreferences {

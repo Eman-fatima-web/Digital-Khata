@@ -121,11 +121,6 @@ authRouter.post('/register', async (req, res) => {
     const useDb = await isDatabaseAvailable()
 
     if (useDb) {
-      const existingUser = await query(`SELECT id FROM users WHERE email = $1`, [email])
-      if (existingUser.rows.length > 0) {
-        return res.status(409).json({ error: 'User already exists' })
-      }
-
       const passwordHash = await bcrypt.hash(password, 10)
 
       const businessResult = await query(
@@ -135,30 +130,46 @@ authRouter.post('/register', async (req, res) => {
       const businessId = businessResult.rows[0].id
 
       const userResult = await query(
-        `INSERT INTO users (email, password_hash, business_id) VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO users (email, password_hash, business_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id`,
         [email, passwordHash, businessId]
       )
-      const userId = userResult.rows[0].id
 
-      const token = generateToken(userId, businessId)
+      let userId: string
+      if (userResult.rows.length > 0) {
+        userId = userResult.rows[0].id
+      } else {
+        const existing = await query(`SELECT id, business_id FROM users WHERE email = $1`, [email])
+        userId = existing.rows[0].id
+      }
+
+      const existingRow = await query(
+        `SELECT u.id, u.business_id, u.email, u.email_verified
+         FROM users u
+         WHERE u.id = $1`,
+        [userId]
+      )
+      const row = existingRow.rows[0]
+
+      const token = generateToken(row.id, row.business_id)
 
       res.status(201).json({
         token,
         user: {
-          id: userId,
-          businessId,
-          email,
-          emailVerified: false,
+          id: row.id,
+          businessId: row.business_id,
+          email: row.email,
+          emailVerified: row.email_verified ?? false,
         },
         message: 'User registered successfully',
       })
     } else {
-      const existing = findUserByEmail(email)
-      if (existing) {
-        return res.status(409).json({ error: 'User already exists' })
+      let user = findUserByEmail(email)
+      if (!user) {
+        user = await createLocalUser(email, password, businessName || 'My Business')
       }
-
-      const user = await createLocalUser(email, password, businessName || 'My Business')
       const token = generateToken(user.id, user.businessId)
 
       res.status(201).json({

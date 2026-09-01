@@ -273,6 +273,10 @@ function Reports() {
               <FileText size={15} />
               {t('reports.exportPdf')}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/reports/received')}>
+              <Wallet size={15} />
+              {t('reports.viewReceivedReport')}
+            </Button>
             <Button variant="outline" onClick={() => navigate('/reminders')}>
               {t('reports.viewReminders')}
               <ChevronRight size={16} />

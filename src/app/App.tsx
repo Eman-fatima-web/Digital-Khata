@@ -17,6 +17,7 @@ const Payments = lazy(() => import('../pages/Payments/Payments'))
 const Sales = lazy(() => import('../pages/Sales/Sales'))
 const AI = lazy(() => import('../pages/AI/AI'))
 const Reports = lazy(() => import('../pages/Reports/Reports'))
+const ReceivedReport = lazy(() => import('../pages/Reports/ReceivedReport'))
 const Reminders = lazy(() => import('../pages/Reminders/Reminders'))
 const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
 const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
@@ -48,6 +49,7 @@ function App() {
           <Route path="/sales" element={<Sales />} />
           <Route path="/ai" element={<AI />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/received" element={<ReceivedReport />} />
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/conflicts" element={<Conflicts />} />

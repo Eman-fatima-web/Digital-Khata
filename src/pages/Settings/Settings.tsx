@@ -324,46 +324,36 @@ function Settings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-ink">{t('settings.dailySalesSummary')}</p>
-                <p className="text-xs text-ink-muted">{t('settings.dailySalesSummaryDesc')}</p>
-              </div>
-              <button
-                role="switch"
-                aria-checked={prefs.dailySalesSummary}
-                onClick={() => updatePrefs({ dailySalesSummary: !prefs.dailySalesSummary })}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  prefs.dailySalesSummary ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    prefs.dailySalesSummary ? 'start-6' : 'start-1'
+            {([
+              { key: 'dailySalesSummary' as const, label: t('settings.dailySalesSummary'), desc: t('settings.dailySalesSummaryDesc') },
+              { key: 'weeklySalesSummary' as const, label: t('settings.weeklySalesSummary'), desc: t('settings.weeklySalesSummaryDesc') },
+              { key: 'monthlySalesSummary' as const, label: t('settings.monthlySalesSummary'), desc: t('settings.monthlySalesSummaryDesc') },
+              { key: 'paymentReminders' as const, label: t('settings.paymentReminders'), desc: t('settings.paymentRemindersDesc') },
+              { key: 'whatsappReminders' as const, label: t('settings.whatsappReminders'), desc: t('settings.whatsappRemindersDesc') },
+              { key: 'smsReminders' as const, label: t('settings.smsReminders'), desc: t('settings.smsRemindersDesc') },
+              { key: 'emailReports' as const, label: t('settings.emailReports'), desc: t('settings.emailReportsDesc') },
+            ]).map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-ink">{item.label}</p>
+                  <p className="text-xs text-ink-muted">{item.desc}</p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={prefs[item.key]}
+                  onClick={() => updatePrefs({ [item.key]: !prefs[item.key] })}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                    prefs[item.key] ? 'bg-primary-500' : 'bg-ink-subtle/40'
                   }`}
-                />
-              </button>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-ink">{t('settings.paymentReminders')}</p>
-                <p className="text-xs text-ink-muted">{t('settings.paymentRemindersDesc')}</p>
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      prefs[item.key] ? 'start-6' : 'start-1'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                role="switch"
-                aria-checked={prefs.paymentReminders}
-                onClick={() => updatePrefs({ paymentReminders: !prefs.paymentReminders })}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  prefs.paymentReminders ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    prefs.paymentReminders ? 'start-6' : 'start-1'
-                  }`}
-                />
-              </button>
-            </div>
+            ))}
           </CardContent>
         </Card>
       </section>
