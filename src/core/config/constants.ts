@@ -19,6 +19,7 @@ export type SyncStatus = (typeof SYNC_STATUS)[keyof typeof SYNC_STATUS]
 export const LANGUAGES = [
   { code: 'en', label: 'English', labelUrdu: 'انگریزی', dir: 'ltr' },
   { code: 'ur', label: 'Urdu', labelUrdu: 'اردو', dir: 'rtl' },
+  { code: 'rom', label: 'Roman Urdu', labelUrdu: 'رومن اردو', dir: 'ltr' },
 ] as const
 
 export type LanguageCode = (typeof LANGUAGES)[number]['code']
@@ -39,4 +40,7 @@ export const STORAGE_KEYS = {
   USER: 'dk-user',
   SHOP: 'dk-shop',
   REMINDER_NOTIFIED_DATE: 'dk-reminder-notified-date',
+  NOTIFICATION_PREFS: 'dk-notification-preferences',
+  DAILY_SUMMARY_NOTIFIED_DATE: 'dk-daily-summary-notified-date',
+  AI_PROVIDER: 'dk-ai-provider',
 } as const

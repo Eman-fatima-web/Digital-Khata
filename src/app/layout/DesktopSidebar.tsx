@@ -37,7 +37,7 @@ export function DesktopSidebar() {
                     className={cn(
                       'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition',
                       isActive
-                        ? 'bg-white text-success-500 shadow-sm'
+                        ? 'bg-surface-card text-success-500 shadow-sm'
                         : 'bg-surface text-ink-subtle group-hover:text-success-500',
                     )}
                   >

@@ -1,3 +1,9 @@
+.env
+.env.local
+.env.*.local
+server/.env
+server/.local-auth.json
+
 # Logs
 logs
 *.log

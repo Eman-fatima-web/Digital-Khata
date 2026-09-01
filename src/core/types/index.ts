@@ -75,6 +75,7 @@ export type User = {
   email?: string
   name: string
   phone?: string
+  emailVerified?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -112,7 +113,20 @@ export type ActionKind =
   | 'ADD_UDHAAR'
   | 'DELETE_UDHAAR'
   | 'DELETE_PAYMENT'
+  | 'DELETE_SALE'
+  | 'RESTORE_CUSTOMER'
+  | 'RESTORE_UDHAAR'
+  | 'RESTORE_PAYMENT'
+  | 'RESTORE_SALE'
+  | 'UPDATE_CUSTOMER'
+  | 'UPDATE_UDHAAR'
+  | 'UPDATE_PAYMENT'
   | 'SEND_REMINDER'
+  | 'CREATE_CUSTOMER'
+  | 'RECORD_SALE'
+  | 'NAVIGATE'
+  | 'SET_THEME'
+  | 'SET_LANGUAGE'
 
 // Metadata about an AI-proposed action. References entities by id; never a
 // copy of the financial records themselves.
@@ -129,8 +143,15 @@ export type ActionProposal = {
   udhaarRemaining?: number
   paymentId?: string
   paymentDate?: string
+  saleId?: string
+  saleDate?: string
   date?: string
-  note?: { en: string; ur: string }
+  note?: { en: string; ur: string; rom?: string }
+  // Navigation action
+  path?: string
+  // Settings action
+  setting?: 'theme' | 'language' | 'notifications'
+  settingValue?: string
 }
 
 // Persisted Khata AI chat message. Deliberately carries no sync fields:
@@ -139,9 +160,24 @@ export type AIMessage = {
   id: string
   userId: string
   shopId: string
+  conversationId?: string
   role: 'user' | 'ai'
   content: string
   createdAt: string
   action?: ActionProposal
   actionState?: 'pending' | 'executing' | 'confirmed' | 'cancelled'
+}
+
+export type Conversation = {
+  id: string
+  userId: string
+  shopId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NotificationPreferences = {
+  dailySalesSummary: boolean
+  paymentReminders: boolean
 }

@@ -8,16 +8,39 @@ import type { VoiceLanguage, VoiceProvider } from './VoiceProvider'
 export class BrowserTTSProvider implements VoiceProvider {
   readonly name = 'browser-tts'
   private isSpeakingFlag = false
+  private autoSpeakEnabled = false
+  private cachedVoice: SpeechSynthesisVoice | null = null
+  private cachedVoiceLanguage: string | null = null
+  private speechQueue: Array<{ text: string; language: VoiceLanguage }> = []
+  private safetyTimer: ReturnType<typeof setTimeout> | null = null
+  private static readonly MAX_QUEUE_SIZE = 10
 
   isAvailable(): boolean {
     if (typeof window === 'undefined') return false
     return 'speechSynthesis' in window
   }
 
+  setAutoSpeak(enabled: boolean): void {
+    this.autoSpeakEnabled = enabled
+  }
+
+  isAutoSpeakEnabled(): boolean {
+    return this.autoSpeakEnabled
+  }
+
   stop(): void {
     if (this.isSpeakingFlag) {
       window.speechSynthesis.cancel()
       this.isSpeakingFlag = false
+    }
+    this.clearSafetyTimer()
+    this.speechQueue = []
+  }
+
+  private clearSafetyTimer(): void {
+    if (this.safetyTimer !== null) {
+      clearTimeout(this.safetyTimer)
+      this.safetyTimer = null
     }
   }
 
@@ -30,47 +53,87 @@ export class BrowserTTSProvider implements VoiceProvider {
       throw new Error('Speech Synthesis not available')
     }
 
-    // Stop any ongoing speech before starting new
-    this.stop()
+    // If already speaking, queue this utterance (capped at MAX_QUEUE_SIZE)
+    if (this.isSpeakingFlag) {
+      if (this.speechQueue.length >= BrowserTTSProvider.MAX_QUEUE_SIZE) {
+        this.speechQueue.shift()
+      }
+      this.speechQueue.push({ text, language })
+      return
+    }
 
+    await this.doSpeak(text, language)
+  }
+
+  private async doSpeak(text: string, language: VoiceLanguage): Promise<void> {
     const utterance = new SpeechSynthesisUtterance(text)
 
     // Set language
     if (language === 'ur') {
       utterance.lang = 'ur-PK'
-    } else if (language === 'en-UR') {
-      // Mixed: try Urdu, fallback to English
+    } else if (language === 'en-UR' || language === 'rom') {
       utterance.lang = 'ur-PK'
     } else {
       utterance.lang = 'en-US'
     }
 
-    // Select voice
-    const voice = this.selectVoice(language)
+    // Select voice (with caching)
+    const voice = this.selectVoiceCached(language)
     if (voice) {
       utterance.voice = voice
     }
 
     // Configure speech parameters for clarity
-    utterance.rate = 0.95 // Slightly slower than normal for clarity
-    utterance.pitch = 1.0 // Natural pitch
-    utterance.volume = 1.0 // Full volume
+    utterance.rate = 0.95
+    utterance.pitch = 1.0
+    utterance.volume = 1.0
 
     this.isSpeakingFlag = true
 
+    // Safety timeout: if onend/onerror never fire (e.g., tab backgrounded),
+    // clear the flag after a reasonable maximum duration.
+    this.clearSafetyTimer()
+    const maxDurationMs = Math.max(text.length * 100 + 10_000, 30_000)
+    this.safetyTimer = setTimeout(() => {
+      this.isSpeakingFlag = false
+      this.speechQueue = []
+    }, maxDurationMs)
+
     return new Promise((resolve, reject) => {
       utterance.onend = () => {
+        this.clearSafetyTimer()
         this.isSpeakingFlag = false
+        // Process next queued utterance
+        const next = this.speechQueue.shift()
+        if (next) {
+          void this.doSpeak(next.text, next.language)
+        }
         resolve()
       }
 
       utterance.onerror = (event) => {
+        this.clearSafetyTimer()
         this.isSpeakingFlag = false
+        this.speechQueue = []
         reject(new Error(`TTS error: ${event.error}`))
       }
 
       window.speechSynthesis.speak(utterance)
     })
+  }
+
+  /**
+   * Cached voice selection — avoids repeated voice list scans
+   */
+  private selectVoiceCached(language: VoiceLanguage): SpeechSynthesisVoice | null {
+    const langKey = language
+    if (this.cachedVoice && this.cachedVoiceLanguage === langKey) {
+      return this.cachedVoice
+    }
+    const voice = this.selectVoiceInternal(language)
+    this.cachedVoice = voice
+    this.cachedVoiceLanguage = langKey
+    return voice
   }
 
   /**
@@ -80,7 +143,7 @@ export class BrowserTTSProvider implements VoiceProvider {
    * 2. Female voice
    * 3. Default browser voice
    */
-  private selectVoice(language: VoiceLanguage): SpeechSynthesisVoice | null {
+  private selectVoiceInternal(language: VoiceLanguage): SpeechSynthesisVoice | null {
     const voices = window.speechSynthesis.getVoices()
 
     if (voices.length === 0) {
@@ -88,7 +151,7 @@ export class BrowserTTSProvider implements VoiceProvider {
       return null
     }
 
-    if (language === 'ur' || language === 'en-UR') {
+    if (language === 'ur' || language === 'en-UR' || language === 'rom') {
       // Try to find Urdu voice
       const urduVoice = voices.find(
         (v) =>
@@ -152,6 +215,14 @@ export class NoOpVoiceProvider implements VoiceProvider {
   }
 
   isSpeaking(): boolean {
+    return false
+  }
+
+  setAutoSpeak(): void {
+    // Silent no-op
+  }
+
+  isAutoSpeakEnabled(): boolean {
     return false
   }
 }

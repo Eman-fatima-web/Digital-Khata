@@ -9,13 +9,14 @@ import {
   Settings,
   Wallet,
   AlarmClock,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react'
 
 export type NavItem = {
   label: string
   labelUrdu: string
-  tKey: 'dashboard' | 'customers' | 'udhaar' | 'payments' | 'sales' | 'reports' | 'reminders' | 'ai' | 'notifications' | 'settings' | 'more'
+  tKey: 'dashboard' | 'customers' | 'udhaar' | 'payments' | 'sales' | 'reports' | 'reminders' | 'ai' | 'notifications' | 'settings' | 'trash' | 'more'
   icon: LucideIcon
   path: string
   mobile?: boolean
@@ -30,6 +31,15 @@ export const NAV_ITEMS: NavItem[] = [
     tKey: 'dashboard',
     icon: LayoutDashboard,
     path: '/dashboard',
+    mobile: true,
+    desktop: true,
+  },
+  {
+    label: 'Khata AI',
+    labelUrdu: 'خاتہ AI',
+    tKey: 'ai',
+    icon: Brain,
+    path: '/ai',
     mobile: true,
     desktop: true,
   },
@@ -91,21 +101,21 @@ export const NAV_ITEMS: NavItem[] = [
     more: true,
   },
   {
-    label: 'Khata AI',
-    labelUrdu: 'خاتہ AI',
-    tKey: 'ai',
-    icon: Brain,
-    path: '/ai',
-    mobile: false,
-    desktop: true,
-    more: true,
-  },
-  {
     label: 'Notifications',
     labelUrdu: 'نوٹیفیکیشنز',
     tKey: 'notifications',
     icon: Bell,
     path: '/notifications',
+    mobile: false,
+    desktop: true,
+    more: true,
+  },
+  {
+    label: 'Trash',
+    labelUrdu: 'ردی کی ٹوکری',
+    tKey: 'trash',
+    icon: Trash2,
+    path: '/trash',
     mobile: false,
     desktop: true,
     more: true,

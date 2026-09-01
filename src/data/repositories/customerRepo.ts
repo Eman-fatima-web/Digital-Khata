@@ -19,8 +19,10 @@ export async function addCustomer(
     updatedAt: now,
   }
 
-  await db.customers.add(customer)
-  await enqueueSyncAction('customers', customer.id, 'create', customer)
+  await db.transaction('rw', db.customers, db.syncQueue, async () => {
+    await db.customers.add(customer)
+    await enqueueSyncAction('customers', customer.id, 'create', customer)
+  })
 
   return customer
 }
@@ -32,33 +34,62 @@ export async function updateCustomer(
   const existing = await db.customers.get(id)
   if (!existing) throw new Error(`Customer ${id} not found`)
 
+  const now = nowISO()
   const updated: Customer = {
     ...existing,
     ...changes,
     id,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
   }
 
-  await db.customers.put(updated)
-  await enqueueSyncAction('customers', id, 'update', updated)
+  await db.transaction('rw', db.customers, db.syncQueue, async () => {
+    await db.customers.put(updated)
+    await enqueueSyncAction('customers', id, 'update', updated)
+  })
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
   const existing = await db.customers.get(id)
   if (!existing) throw new Error(`Customer ${id} not found`)
 
+  const now = nowISO()
   const deleted: Customer = {
     ...existing,
-    updatedAt: nowISO(),
+    updatedAt: now,
     syncStatus: 'pending',
     version: existing.version + 1,
     isDeleted: true,
   }
 
-  await db.customers.put(deleted)
-  await enqueueSyncAction('customers', id, 'delete', deleted)
+  await db.transaction('rw', db.customers, db.syncQueue, async () => {
+    await db.customers.put(deleted)
+    await enqueueSyncAction('customers', id, 'delete', deleted)
+  })
+}
+
+export async function restoreCustomer(id: string): Promise<void> {
+  const existing = await db.customers.get(id)
+  if (!existing) throw new Error(`Customer ${id} not found`)
+
+  const now = nowISO()
+  const restored: Customer = {
+    ...existing,
+    updatedAt: now,
+    syncStatus: 'pending',
+    version: existing.version + 1,
+    isDeleted: false,
+  }
+
+  await db.transaction('rw', db.customers, db.syncQueue, async () => {
+    await db.customers.put(restored)
+    await enqueueSyncAction('customers', id, 'update', restored)
+  })
+}
+
+export async function getDeletedCustomers(): Promise<Customer[]> {
+  return db.customers.filter((c) => c.isDeleted === true).sortBy('updatedAt')
 }
 
 export async function getCustomerById(id: string): Promise<Customer | undefined> {

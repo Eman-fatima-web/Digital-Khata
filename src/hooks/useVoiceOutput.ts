@@ -68,11 +68,21 @@ export function useVoiceOutput() {
     return provider?.isSpeaking() ?? false
   }, [])
 
+  const setAutoSpeak = useCallback((enabled: boolean) => {
+    providerRef.current?.setAutoSpeak(enabled)
+  }, [])
+
+  const isAutoSpeakEnabled = useCallback(() => {
+    return providerRef.current?.isAutoSpeakEnabled() ?? false
+  }, [])
+
   return {
     speak,
     stop,
     isSpeaking,
     isAvailable,
+    setAutoSpeak,
+    isAutoSpeakEnabled,
     state,
     error,
   }

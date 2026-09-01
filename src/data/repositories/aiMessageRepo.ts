@@ -5,8 +5,6 @@ export async function addAIMessage(message: AIMessage): Promise<void> {
   await db.aiMessages.add(message)
 }
 
-// Only terminal states are persisted; a transient 'executing' state is never
-// written so a reload can never leave a stuck spinner in history.
 export async function updateAIMessageState(
   id: string,
   actionState: 'confirmed' | 'cancelled',
@@ -14,19 +12,28 @@ export async function updateAIMessageState(
   await db.aiMessages.update(id, { actionState })
 }
 
-export async function getAIMessageHistory(owner: {
-  userId: string
-  shopId: string
-}): Promise<AIMessage[]> {
+export async function getAIMessageHistory(
+  owner: { userId: string; shopId: string },
+  conversationId?: string,
+): Promise<AIMessage[]> {
+  if (conversationId) {
+    return db.aiMessages
+      .where({ conversationId })
+      .sortBy('createdAt')
+  }
   return db.aiMessages
     .where({ userId: owner.userId, shopId: owner.shopId })
     .sortBy('createdAt')
 }
 
-export async function clearAIMessageHistory(owner: {
-  userId: string
-  shopId: string
-}): Promise<void> {
+export async function clearAIMessageHistory(
+  owner: { userId: string; shopId: string },
+  conversationId?: string,
+): Promise<void> {
+  if (conversationId) {
+    await db.aiMessages.where({ conversationId }).delete()
+    return
+  }
   await db.aiMessages
     .where({ userId: owner.userId, shopId: owner.shopId })
     .delete()

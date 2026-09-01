@@ -177,3 +177,416 @@ export function downloadUdhaarReceipt(
 
   save(doc, number)
 }
+
+interface ReportData {
+  periodLabel: string
+  totalUdhaar: number
+  totalPayments: number
+  totalSales: number
+  outstanding: number
+  overdue: number
+  transactionCount: number
+  topCustomers: { name: string; phone?: string; amount: number }[]
+  recentTransactions: { title: string; amount: number; date: string; type: string }[]
+}
+
+export function downloadReportPdf(data: ReportData): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+  const width = 210
+  const margin = 15
+  const contentWidth = width - margin * 2
+
+  let y = 20
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(...TEAL)
+  doc.text(APP_NAME, width / 2, y, { align: 'center' })
+
+  y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...MUTED)
+  doc.text('Business Report', width / 2, y, { align: 'center' })
+
+  y += 6
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK)
+  doc.text(`Period: ${data.periodLabel}`, width / 2, y, { align: 'center' })
+
+  y += 4
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...MUTED)
+  doc.text(`Generated: ${formatDate(new Date().toISOString())}`, width / 2, y, { align: 'center' })
+
+  y += 8
+  doc.setDrawColor(...HAIRLINE)
+  doc.setLineWidth(0.4)
+  doc.line(margin, y, width - margin, y)
+  y += 8
+
+  const statBoxes: [string, string][] = [
+    ['Total Udhaar', formatCurrency(data.totalUdhaar)],
+    ['Total Payments', formatCurrency(data.totalPayments)],
+    ['Total Sales', formatCurrency(data.totalSales)],
+    ['Outstanding', formatCurrency(data.outstanding)],
+    ['Overdue', formatCurrency(data.overdue)],
+    ['Transactions', String(data.transactionCount)],
+  ]
+
+  const boxW = (contentWidth - 10) / 3
+  const boxH = 22
+  for (let i = 0; i < statBoxes.length; i++) {
+    const col = i % 3
+    const row = Math.floor(i / 3)
+    const bx = margin + col * (boxW + 5)
+    const by = y + row * (boxH + 4)
+
+    doc.setFillColor(250, 252, 250)
+    doc.setDrawColor(...HAIRLINE)
+    doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'FD')
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...MUTED)
+    doc.text(statBoxes[i][0], bx + 4, by + 8)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...TEAL)
+    doc.text(statBoxes[i][1], bx + 4, by + 16)
+  }
+
+  y += Math.ceil(statBoxes.length / 3) * (boxH + 4) + 6
+
+  if (data.topCustomers.length > 0) {
+    doc.setDrawColor(...HAIRLINE)
+    doc.line(margin, y, width - margin, y)
+    y += 6
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('Top Customers by Outstanding', margin, y)
+    y += 6
+
+    doc.setFillColor(...TEAL)
+    doc.roundedRect(margin, y, contentWidth, 7, 0, 0, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    doc.text('#', margin + 4, y + 5)
+    doc.text('Customer', margin + 14, y + 5)
+    doc.text('Phone', margin + 90, y + 5)
+    doc.text('Outstanding', width - margin - 4, y + 5, { align: 'right' })
+    y += 9
+
+    doc.setFontSize(8)
+    for (let i = 0; i < data.topCustomers.length; i++) {
+      const c = data.topCustomers[i]
+      const isEven = i % 2 === 0
+      if (isEven) {
+        doc.setFillColor(247, 250, 247)
+        doc.rect(margin, y - 4, contentWidth, 7, 'F')
+      }
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(`${i + 1}`, margin + 4, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...INK)
+      doc.text(c.name, margin + 14, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(c.phone ?? '-', margin + 90, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(220, 38, 38)
+      doc.text(formatCurrency(c.amount), width - margin - 4, y, { align: 'right' })
+      y += 7
+    }
+    y += 4
+  }
+
+  if (data.recentTransactions.length > 0) {
+    if (y > 250) {
+      doc.addPage()
+      y = 20
+    }
+
+    doc.setDrawColor(...HAIRLINE)
+    doc.line(margin, y, width - margin, y)
+    y += 6
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('Recent Transactions', margin, y)
+    y += 6
+
+    doc.setFillColor(...TEAL)
+    doc.roundedRect(margin, y, contentWidth, 7, 0, 0, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Date', margin + 4, y + 5)
+    doc.text('Description', margin + 35, y + 5)
+    doc.text('Type', margin + 120, y + 5)
+    doc.text('Amount', width - margin - 4, y + 5, { align: 'right' })
+    y += 9
+
+    doc.setFontSize(8)
+    for (let i = 0; i < data.recentTransactions.length; i++) {
+      const tx = data.recentTransactions[i]
+      if (y > 280) {
+        doc.addPage()
+        y = 20
+      }
+      const isEven = i % 2 === 0
+      if (isEven) {
+        doc.setFillColor(247, 250, 247)
+        doc.rect(margin, y - 4, contentWidth, 7, 'F')
+      }
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(formatDate(tx.date), margin + 4, y)
+      doc.setTextColor(...INK)
+      const desc = tx.title.length > 40 ? tx.title.slice(0, 38) + '...' : tx.title
+      doc.text(desc, margin + 35, y)
+      doc.setTextColor(...MUTED)
+      doc.text(tx.type, margin + 120, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(tx.type === 'payment' ? 15 : 23, tx.type === 'payment' ? 118 : 33, tx.type === 'payment' ? 110 : 31)
+      doc.text(formatCurrency(tx.amount), width - margin - 4, y, { align: 'right' })
+      y += 7
+    }
+  }
+
+  y += 8
+  doc.setDrawColor(...HAIRLINE)
+  doc.line(margin, y, width - margin, y)
+  y += 6
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK)
+  doc.text('Thank you for using Digital Khata!', width / 2, y, { align: 'center' })
+  y += 5
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(...MUTED)
+  doc.text(`Generated by ${APP_NAME} — Smart Business Ledger`, width / 2, y, { align: 'center' })
+
+  doc.save(`report-${data.periodLabel.toLowerCase().replace(/\s+/g, '-')}.pdf`)
+}
+
+interface ReceivedReportData {
+  period: 'daily' | 'weekly' | 'monthly'
+  startDate: string
+  totalReceived: number
+  paymentCount: number
+  byMethod: Record<string, number>
+  topPayers: { name: string; total: number; count: number }[]
+  payments: { date: string; customerName: string; amount: number; method: string }[]
+}
+
+export function downloadReceivedReportPdf(data: ReceivedReportData): void {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+  const width = 210
+  const margin = 15
+  const contentWidth = width - margin * 2
+
+  const periodLabel = data.period === 'daily' ? 'Today' : data.period === 'weekly' ? 'Last 7 Days' : 'This Month'
+
+  let y = 20
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(...TEAL)
+  doc.text(APP_NAME, width / 2, y, { align: 'center' })
+
+  y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...MUTED)
+  doc.text('Payments Received Report', width / 2, y, { align: 'center' })
+
+  y += 6
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK)
+  doc.text(`Period: ${periodLabel} (from ${data.startDate})`, width / 2, y, { align: 'center' })
+
+  y += 4
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...MUTED)
+  doc.text(`Generated: ${formatDate(new Date().toISOString())}`, width / 2, y, { align: 'center' })
+
+  y += 8
+  doc.setDrawColor(...HAIRLINE)
+  doc.setLineWidth(0.4)
+  doc.line(margin, y, width - margin, y)
+  y += 8
+
+  const summaryBoxes: [string, string][] = [
+    ['Total Received', formatCurrency(data.totalReceived)],
+    ['Payment Count', String(data.paymentCount)],
+    ['Avg Payment', data.paymentCount > 0 ? formatCurrency(Math.round(data.totalReceived / data.paymentCount)) : formatCurrency(0)],
+  ]
+
+  const boxW = (contentWidth - 10) / 3
+  const boxH = 22
+  for (let i = 0; i < summaryBoxes.length; i++) {
+    const bx = margin + i * (boxW + 5)
+    doc.setFillColor(250, 252, 250)
+    doc.setDrawColor(...HAIRLINE)
+    doc.roundedRect(bx, y, boxW, boxH, 2, 2, 'FD')
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(...MUTED)
+    doc.text(summaryBoxes[i][0], bx + 4, y + 8)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(...TEAL)
+    doc.text(summaryBoxes[i][1], bx + 4, y + 16)
+  }
+
+  y += boxH + 8
+
+  const methodEntries = Object.entries(data.byMethod)
+  if (methodEntries.length > 0) {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('By Payment Method', margin, y)
+    y += 6
+
+    doc.setFontSize(8)
+    for (const [method, amount] of methodEntries) {
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(method, margin + 4, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...INK)
+      doc.text(formatCurrency(amount), width - margin - 4, y, { align: 'right' })
+      y += 6
+    }
+    y += 4
+  }
+
+  if (data.topPayers.length > 0) {
+    doc.setDrawColor(...HAIRLINE)
+    doc.line(margin, y, width - margin, y)
+    y += 6
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('Top Payers', margin, y)
+    y += 6
+
+    doc.setFillColor(...TEAL)
+    doc.roundedRect(margin, y, contentWidth, 7, 0, 0, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    doc.text('#', margin + 4, y + 5)
+    doc.text('Customer', margin + 14, y + 5)
+    doc.text('Payments', margin + 100, y + 5)
+    doc.text('Total', width - margin - 4, y + 5, { align: 'right' })
+    y += 9
+
+    doc.setFontSize(8)
+    for (let i = 0; i < data.topPayers.length; i++) {
+      const p = data.topPayers[i]
+      if (i % 2 === 0) {
+        doc.setFillColor(247, 250, 247)
+        doc.rect(margin, y - 4, contentWidth, 7, 'F')
+      }
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(`${i + 1}`, margin + 4, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...INK)
+      doc.text(p.name, margin + 14, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(String(p.count), margin + 100, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...TEAL)
+      doc.text(formatCurrency(p.total), width - margin - 4, y, { align: 'right' })
+      y += 7
+    }
+    y += 4
+  }
+
+  if (data.payments.length > 0) {
+    if (y > 240) {
+      doc.addPage()
+      y = 20
+    }
+
+    doc.setDrawColor(...HAIRLINE)
+    doc.line(margin, y, width - margin, y)
+    y += 6
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('Payment Details', margin, y)
+    y += 6
+
+    doc.setFillColor(...TEAL)
+    doc.roundedRect(margin, y, contentWidth, 7, 0, 0, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Date', margin + 4, y + 5)
+    doc.text('Customer', margin + 35, y + 5)
+    doc.text('Method', margin + 120, y + 5)
+    doc.text('Amount', width - margin - 4, y + 5, { align: 'right' })
+    y += 9
+
+    doc.setFontSize(8)
+    for (let i = 0; i < data.payments.length; i++) {
+      const p = data.payments[i]
+      if (y > 280) {
+        doc.addPage()
+        y = 20
+      }
+      if (i % 2 === 0) {
+        doc.setFillColor(247, 250, 247)
+        doc.rect(margin, y - 4, contentWidth, 7, 'F')
+      }
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text(formatDate(p.date), margin + 4, y)
+      doc.setTextColor(...INK)
+      doc.text(p.customerName, margin + 35, y)
+      doc.setTextColor(...MUTED)
+      doc.text(p.method, margin + 120, y)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...TEAL)
+      doc.text(formatCurrency(p.amount), width - margin - 4, y, { align: 'right' })
+      y += 7
+    }
+  }
+
+  y += 8
+  doc.setDrawColor(...HAIRLINE)
+  doc.line(margin, y, width - margin, y)
+  y += 6
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(...INK)
+  doc.text('Thank you for using Digital Khata!', width / 2, y, { align: 'center' })
+  y += 5
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(...MUTED)
+  doc.text(`Generated by ${APP_NAME} — Smart Business Ledger`, width / 2, y, { align: 'center' })
+
+  doc.save(`received-report-${data.period}-${data.startDate}.pdf`)
+}

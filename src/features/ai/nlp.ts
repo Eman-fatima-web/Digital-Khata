@@ -140,7 +140,7 @@ const WORD_NUMBERS: Record<string, number> = {
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
   sixty: 60, seventy: 70, eighty: 80, ninety: 90,
   ek: 1, aik: 1, do: 2, teen: 3, char: 4, chaar: 4, panch: 5, paanch: 5, chhe: 6, che: 6,
-  chay: 6, sat: 7, saat: 7, aath: 8, ath: 8, nau: 9, no: 9, das: 10, gyarah: 11,
+  chay: 6, sat: 7, saat: 7, aath: 8, ath: 8, nau: 9, das: 10, gyarah: 11,
   gyaara: 11, barah: 12, terah: 13, chaudah: 14, pandrah: 15, solah: 16, satrah: 17,
   atharah: 18, unnis: 19, bees: 20, tees: 30, chalis: 40, pachas: 50, saath: 60,
   sattar: 70, assi: 80, nabbe: 90,
@@ -231,3 +231,147 @@ export function isInPeriod(dateStr: string, period: Period): boolean {
 }
 
 export function localToday(): string { return localDateKey() }
+
+const PRONOUNS = [
+  'us ne', 'us ko', 'us ka', 'us ki', 'uske', 'uski', 'uska', 'usse',
+  'woh', 'wo', 'ye', 'yeh', 'inhone', 'inho ne', 'inhon ne', 'unko', 'unki', 'unka',
+  'him', 'her', 'them', 'he', 'she', 'it', 'they',
+  'that customer', 'the same', 'same customer', 'usko', 'usne',
+  'اس نے', 'اس کو', 'اس کا', 'اس کی', 'وہ', 'یہ', 'انہوں نے', 'ان کو',
+]
+
+export function detectPronoun(input: string): boolean {
+  const norm = normalize(input)
+  return PRONOUNS.some((pronoun) => norm.includes(pronoun))
+}
+
+const CUSTOMER_ACTION_PATTERNS = [
+  /\b(?:naya|nayi|new|add|create|banao|banado|banai|bana)\s+(?:customer|gahak|گاہک|customer)/i,
+  /\b(?:customer|gahak|گاہک)\s+(?:add|create|banao|banado|banai|bana|naya|nayi|new)/i,
+  /\bنیا\s+گاہک\b/,
+  /\bگاہک\s+(?:بنائ|بناؤ|شامل)\b/,
+]
+
+export function detectNewCustomer(input: string): { name: string; phone?: string } | undefined {
+  const norm = normalize(input)
+  const isCustomerAction = CUSTOMER_ACTION_PATTERNS.some((pattern) => pattern.test(norm))
+  if (!isCustomerAction) return undefined
+
+  const tokens = norm.split(/\s+/).filter((token) => token && !STOPWORDS.has(token))
+  const actionWords = new Set(['naya', 'nayi', 'new', 'add', 'create', 'banao', 'banado', 'banai', 'bana', 'customer', 'gahak', 'نیا', 'گاہک'])
+  const nameTokens = tokens.filter((token) => !actionWords.has(token) && !/^\d+$/.test(token))
+
+  if (nameTokens.length === 0) return undefined
+
+  const phoneMatch = norm.match(/(?:phone|number|no|num|فون|نمبر)?\s*[:+]?\s*(\d{10,15})/)
+  const phone = phoneMatch ? phoneMatch[1] : undefined
+
+  return { name: nameTokens.join(' '), phone }
+}
+
+const GREETING_PATTERNS = [
+  /\b(?:assalam|salam|slm|hello|hi|hey|good\s*(?:morning|afternoon|evening)|aoa)\b/i,
+  /\bسلام\b/,
+  /\bالسلام\s+علیکم\b/,
+  /\bآداب\b/,
+  /\bہیلو\b/,
+]
+
+export function detectGreeting(input: string): boolean {
+  const norm = normalize(input)
+  return GREETING_PATTERNS.some((pattern) => pattern.test(norm))
+}
+
+const NEGATION_TERMS = [
+  "don't", 'dont', 'do not', 'never', 'no', 'stop', 'cancel',
+  'mat', 'mato', 'nahi', 'nahi', 'nahin', 'na', 'mat karo',
+  'نہیں', 'مت', 'نہ', 'مت کرو',
+]
+
+export function detectNegation(input: string): boolean {
+  const norm = normalize(input)
+  return NEGATION_TERMS.some((term) => {
+    const normalizedTerm = normalize(term)
+    if (!normalizedTerm) return false
+    if (normalizedTerm.length <= 2) return new RegExp(`\\b${normalizedTerm}\\b`).test(norm)
+    return norm.includes(normalizedTerm)
+  })
+}
+
+const EXTENDED_PERIODS: Array<{ key: ExpandedPeriod; patterns: RegExp[] }> = [
+  {
+    key: 'yesterday',
+    patterns: [/\byesterday\b/, /\bkal\b/, /کل/],
+  },
+  {
+    key: 'last_week',
+    patterns: [/\blast\s*week\b/, /\bpichle?\s*hafte?\b/, /پچھلے\s*ہفتے/],
+  },
+  {
+    key: 'last_month',
+    patterns: [/\blast\s*month\b/, /\bpichle?\s*mahine?\b/, /پچھلے\s*مہینے/],
+  },
+  {
+    key: 'last_7_days',
+    patterns: [/\bpast\s*7\s*days?\b/, /\blast\s*7\s*days?\b/, /\bpichle?\s*7\s*din\b/],
+  },
+  {
+    key: 'last_30_days',
+    patterns: [/\bpast\s*30\s*days?\b/, /\blast\s*30\s*days?\b/, /\bpichle?\s*30\s*din\b/],
+  },
+]
+
+export type ExpandedPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last_week' | 'last_month' | 'last_7_days' | 'last_30_days'
+
+export function detectExpandedPeriod(input: string): ExpandedPeriod {
+  const norm = normalize(input)
+  for (const entry of EXTENDED_PERIODS) {
+    if (entry.patterns.some((p) => p.test(norm))) return entry.key
+  }
+  if (/\bweek\b|\bhafte?\b|ہفت[ےہ]/.test(norm)) return 'week'
+  if (/\bmonth\b|\bmahine?\b|\bmahina\b|مہین[ےہ]/.test(norm)) return 'month'
+  if (/\btoday\b|\baaj\b|آج/.test(norm)) return 'today'
+  return 'month'
+}
+
+export function expandedPeriodRange(period: ExpandedPeriod): { start: Date; end: Date } {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const day = 24 * 60 * 60 * 1000
+
+  switch (period) {
+    case 'today':
+      return { start: today, end: new Date(today.getTime() + day) }
+    case 'yesterday':
+      return { start: new Date(today.getTime() - day), end: today }
+    case 'week':
+      return { start: new Date(today.getTime() - 6 * day), end: new Date(today.getTime() + day) }
+    case 'month':
+      return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 1) }
+    case 'last_week': {
+      const startOfWeek = new Date(today.getTime() - today.getDay() * day)
+      return { start: new Date(startOfWeek.getTime() - 7 * day), end: startOfWeek }
+    }
+    case 'last_month': {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { start: new Date(now.getFullYear(), now.getMonth() - 1, 1), end: startOfMonth }
+    }
+    case 'last_7_days':
+      return { start: new Date(today.getTime() - 7 * day), end: new Date(today.getTime() + day) }
+    case 'last_30_days':
+      return { start: new Date(today.getTime() - 30 * day), end: new Date(today.getTime() + day) }
+  }
+}
+
+export function isInExpandedPeriod(dateStr: string, period: ExpandedPeriod): boolean {
+  const { start, end } = expandedPeriodRange(period)
+  const date = new Date(dateStr)
+  return date >= start && date < end
+}
+
+const SPLIT_PATTERN = /\b(?:and|aur|phir|bhi)\b|اور|پھر|اور\s|،|,/
+
+export function splitCompoundInput(input: string): string[] {
+  const parts = input.split(SPLIT_PATTERN).map((part) => part.trim()).filter(Boolean)
+  return parts.length > 1 ? parts : [input]
+}

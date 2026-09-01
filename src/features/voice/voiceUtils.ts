@@ -65,7 +65,8 @@ export function isSpeakable(text: string): boolean {
   }
 
   // Skip if mostly numbers/technical content
-  const alphaRatio = (text.match(/[a-zA-Z]/g) || []).length / text.length
+  // Include Urdu script range (\u0600-\u06FF) alongside Latin alphabet
+  const alphaRatio = (text.match(/[a-zA-Z\u0600-\u06FF]/g) || []).length / text.length
   if (alphaRatio < 0.4) {
     return false
   }

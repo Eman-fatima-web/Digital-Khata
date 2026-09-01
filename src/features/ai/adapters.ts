@@ -1,6 +1,7 @@
 import type { AIAdapter, AIRequest, AIResult, KhataSnapshot } from './types'
 import { runEngine } from './engine'
 import { getResponses } from './responses'
+import { sendChatMessage, isAuthenticated } from '../../services/api'
 
 export type CloudAIProvider = 'openai-compatible' | 'custom'
 
@@ -20,6 +21,7 @@ export type CloudAIErrorCode =
   | 'http-5xx'
   | 'invalid-json'
   | 'malformed-response'
+  | 'not-authenticated'
 
 export class CloudAIError extends Error {
   readonly code: CloudAIErrorCode
@@ -47,7 +49,7 @@ export class LocalAIAdapter implements AIAdapter {
 
 export function getCloudAIConfig(): CloudAIConfig {
   const enabledValue = import.meta.env.VITE_AI_ENABLED
-  const endpoint = (import.meta.env.VITE_AI_ENDPOINT as string | undefined ?? '').trim()
+  const endpoint = (import.meta.env.VITE_API_BASE_URL as string | undefined ?? '').trim()
   const provider = (import.meta.env.VITE_AI_PROVIDER as CloudAIProvider | undefined) ?? 'openai-compatible'
   const model = (import.meta.env.VITE_AI_MODEL as string | undefined ?? 'gpt-4o-mini').trim()
   const timeoutMs = Number(import.meta.env.VITE_AI_TIMEOUT_MS ?? '8000')
@@ -66,7 +68,10 @@ export class CloudAIAdapter implements AIAdapter {
 
   isAvailable(): boolean {
     const config = getCloudAIConfig()
-    return config.enabled && config.endpoint.length > 0
+    // Check if backend is configured and user is authenticated
+    if (!config.enabled || config.endpoint.length === 0) return false
+    if (!isAuthenticated()) return false
+    return true
   }
 
   async answer(request: AIRequest): Promise<AIResult> {
@@ -79,117 +84,57 @@ export class CloudAIAdapter implements AIAdapter {
       )
     }
 
-    const summary = summarizeData(request.data)
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), config.timeoutMs)
+    if (!isAuthenticated()) {
+      throw new CloudAIError(
+        'not-authenticated',
+        'Not authenticated. Please login to use advanced AI features.',
+      )
+    }
 
     try {
-      const response = await fetch(config.endpoint, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          provider: config.provider,
-          model: config.model,
-          language: request.language,
-          prompt: request.input,
-          summary,
-          instruction:
-            'Answer conversational questions using only the summary data. Never claim to create or modify financial records. Never reveal secrets or API keys. Do not return any action JSON or mutation instructions.',
-          allowUnsafeActions: false,
-        }),
-      })
+      // Call the backend AI gateway
+      const response = await sendChatMessage(
+        request.input,
+        request.context?.turns.map(t => ({
+          role: t.role === 'ai' ? 'assistant' : t.role,
+          content: t.input,
+        })),
+        request.data ? summarizeData(request.data) : undefined
+      )
 
-      if (!response.ok) {
-        const code = response.status >= 500 ? 'http-5xx' : 'http-4xx'
-        throw new CloudAIError(
-          code,
-          'Cloud AI request failed. I will use the local Khata AI instead.',
-          response.status,
-        )
+      return {
+        type: 'answer',
+        text: response.response,
       }
-
-      const json = (await response.json()) as unknown
-      const text = extractCloudText(json)
-      return { type: 'answer', text }
     } catch (error) {
-      if (error instanceof CloudAIError) throw error
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new CloudAIError('timeout', 'Cloud AI timed out. I will use the local Khata AI instead.')
-      }
-      if (error instanceof SyntaxError) {
-        throw new CloudAIError('invalid-json', 'Cloud AI returned invalid data. I will use the local Khata AI instead.')
+      if (error instanceof Error) {
+        if (error.message.includes('Authentication')) {
+          throw new CloudAIError('not-authenticated', error.message)
+        }
+        if (error.message.includes('timeout') || error.message.includes('aborted')) {
+          throw new CloudAIError('timeout', 'Cloud AI timed out. I will use the local Khata AI instead.')
+        }
       }
       throw new CloudAIError(
         'provider-unavailable',
         'Cloud AI is unavailable right now. I will use the local Khata AI instead.',
       )
-    } finally {
-      window.clearTimeout(timeoutId)
     }
   }
 }
 
-function extractCloudText(payload: unknown): string {
-  if (typeof payload === 'string') return payload.trim()
-
-  if (payload === null || typeof payload !== 'object') {
-    throw new CloudAIError('malformed-response', 'Cloud AI returned an unexpected response.')
-  }
-
-  const record = payload as Record<string, unknown>
-  const directMessage = record.message
-  if (directMessage && typeof directMessage === 'object') {
-    const messageText = pickString(directMessage as Record<string, unknown>, ['content', 'text'])
-    if (messageText) return messageText
-  }
-
-  const directText = pickString(record, ['text', 'answer', 'content', 'reply'])
-  if (directText) return directText
-
-  const choices = Array.isArray(record.choices) ? record.choices : []
-  const firstChoice = choices[0]
-  if (firstChoice && typeof firstChoice === 'object') {
-    const nested = firstChoice as Record<string, unknown>
-    const choiceText = pickString(nested, ['text', 'content'])
-    if (choiceText) return choiceText
-
-    const message = nested.message
-    if (message && typeof message === 'object') {
-      const content = pickString(message as Record<string, unknown>, ['content', 'text'])
-      if (content) return content
-    }
-  }
-
-  const outputText = pickString(record, ['output_text', 'generated_text'])
-  if (outputText) return outputText
-
-  throw new CloudAIError('malformed-response', 'Cloud AI returned a response in an unexpected format.')
-}
-
-function pickString(record: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = record[key]
-    if (typeof value === 'string' && value.trim().length > 0) return value.trim()
-    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
-      const first = value[0].trim()
-      if (first.length > 0) return first
-    }
-  }
-  return undefined
-}
-
-export function summarizeData(data: KhataSnapshot) {
+function summarizeData(data: KhataSnapshot) {
   const today = new Date().toLocaleDateString('en-CA')
   const balances = new Map<string, number>()
-  const customerNameById = new Map<string, string>()
 
-  for (const customer of data.customers) {
-    customerNameById.set(customer.id, customer.name)
-  }
+  // Anonymize customer names before sending to cloud — replace with
+  // "Customer A", "Customer B", etc. to protect PII.
+  const anonymizedNameById = new Map<string, string>()
+  const sortedCustomers = [...data.customers].sort((a, b) => a.name.localeCompare(b.name))
+  sortedCustomers.forEach((customer, index) => {
+    const label = String.fromCharCode(65 + index) // A, B, C, ...
+    anonymizedNameById.set(customer.id, `Customer ${label}`)
+  })
 
   for (const entry of data.udhaar) {
     if (entry.remainingAmount <= 0) continue
@@ -199,7 +144,7 @@ export function summarizeData(data: KhataSnapshot) {
   const customerSummaries = Array.from(balances.entries())
     .map(([customerId, outstanding]) => ({
       id: customerId,
-      name: customerNameById.get(customerId) ?? 'Unknown customer',
+      name: anonymizedNameById.get(customerId) ?? 'Unknown customer',
       outstanding,
     }))
     .sort((a, b) => b.outstanding - a.outstanding)

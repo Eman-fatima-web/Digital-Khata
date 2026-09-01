@@ -4,7 +4,7 @@
  * Replaceable for future production voice providers
  */
 
-export type VoiceLanguage = 'en' | 'ur' | 'en-UR' // en, ur, or mixed English+Roman Urdu
+export type VoiceLanguage = 'en' | 'ur' | 'rom' | 'en-UR' // en, ur, rom, or mixed English+Roman Urdu
 
 export interface VoiceProvider {
   /**
@@ -35,6 +35,16 @@ export interface VoiceProvider {
    * Check if currently speaking
    */
   isSpeaking(): boolean
+
+  /**
+   * Enable or disable auto-speak (automatically speak AI responses)
+   */
+  setAutoSpeak(enabled: boolean): void
+
+  /**
+   * Check if auto-speak is enabled
+   */
+  isAutoSpeakEnabled(): boolean
 }
 
 /**
