@@ -5,13 +5,19 @@ const hasConnectionString = Boolean(process.env.DATABASE_URL)
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  // Pool size is configurable via environment; credentials come only from DATABASE_URL
+  max: Number(process.env.DB_POOL_MAX) || 20,
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS) || 30000,
+  connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 2000,
 })
 
 pool.on('error', (err) => {
-  logger.error({ err }, 'Unexpected database error')
+  // Log message only — never log the connection string or credentials
+  logger.error({ err: err.message }, 'Unexpected database pool error')
+})
+
+pool.on('connect', () => {
+  logger.debug('Database pool connection established')
 })
 
 let dbAvailable: boolean | null = hasConnectionString ? null : false
@@ -38,13 +44,13 @@ export async function query(text: string, params?: unknown[]) {
 
 export async function getClient() {
   const client = await pool.connect()
-  
+
   // Set business context for RLS
   const businessId = (client as unknown as { businessId?: string }).businessId
   if (businessId) {
     await client.query('SELECT set_config($1, $2, true)', ['app.business_id', businessId])
   }
-  
+
   return client
 }
 

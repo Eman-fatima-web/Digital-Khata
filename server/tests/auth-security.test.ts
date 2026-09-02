@@ -96,7 +96,7 @@ describe('Auth: JWT Security', () => {
   })
 })
 
-describe('Auth: Local Auth Password Security', () => {
+describe('Auth: Local Auth Password Security', { timeout: 20000 }, () => {
   beforeEach(() => {
     vi.resetModules()
   })

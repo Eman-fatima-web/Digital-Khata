@@ -17,6 +17,7 @@ type AuthUser = {
 
 type AuthState = {
   user: AuthUser | null
+  token: string | null
   isLoading: boolean
 }
 
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const tokens = loadAuthTokens()
     return {
       user: tokens?.user ?? null,
+      token: tokens?.token ?? null,
       isLoading: false,
     }
   })
@@ -44,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true }))
     try {
       const tokens = await apiLogin(email, password)
-      setState({ user: tokens.user, isLoading: false })
+      setState({ user: tokens.user, token: tokens.token, isLoading: false })
     } catch (error) {
       setState((prev) => ({ ...prev, isLoading: false }))
       throw error
@@ -55,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isLoading: true }))
     try {
       const tokens = await apiRegister(email, password, businessName)
-      setState({ user: tokens.user, isLoading: false })
+      setState({ user: tokens.user, token: tokens.token, isLoading: false })
     } catch (error) {
       setState((prev) => ({ ...prev, isLoading: false }))
       throw error
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     apiLogout()
-    setState({ user: null, isLoading: false })
+    setState({ user: null, token: null, isLoading: false })
   }, [])
 
   const sendVerification = useCallback(async () => {
@@ -74,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshEmailStatus = useCallback(() => {
     const tokens = loadAuthTokens()
     if (tokens?.user) {
-      setState((prev) => ({ ...prev, user: tokens.user }))
+      setState((prev) => ({ ...prev, user: tokens.user, token: tokens.token }))
     }
   }, [])
 

@@ -11,7 +11,7 @@ type AuditLogEntry = {
   toolName: string
   status: string
   recordId: string | null
-  details: any
+  details: Record<string, unknown> | null
   createdAt: string
 }
 
@@ -50,19 +50,19 @@ export default function AuditLog() {
           <FileText size={20} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-ink">{t('audit.title', 'Audit Log')}</h1>
-          <p className="text-sm text-ink-muted">{t('audit.description', 'View recent system activities and AI actions')}</p>
+          <h1 className="text-2xl font-bold text-ink">{t('audit.title')}</h1>
+          <p className="text-sm text-ink-muted">{t('audit.description')}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('audit.recentActivities', 'Recent Activities')}</CardTitle>
+          <CardTitle>{t('audit.recentActivities')}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading && (
             <div className="py-8 text-center text-ink-muted">
-              {t('common.loading', 'Loading...')}
+              {t('common.loading')}
             </div>
           )}
 
@@ -74,7 +74,7 @@ export default function AuditLog() {
 
           {!loading && !error && logs.length === 0 && (
             <div className="py-8 text-center text-ink-muted">
-              {t('audit.noLogs', 'No audit logs found')}
+              {t('audit.noLogs')}
             </div>
           )}
 

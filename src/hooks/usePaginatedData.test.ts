@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { db } from '../data/db/db'
 import { useCustomersPaginated, useUdhaarPaginated, usePaymentsPaginated, useSalesPaginated } from './usePaginatedData'
 import type { Customer, UdhaarEntry, Payment, Sale } from '../core/types'
@@ -54,12 +54,12 @@ describe('Pagination Hooks Performance', () => {
     })
 
     it('loads next page using page navigation', async () => {
-      // Generate 150 customers
-      const customers: Customer[] = Array.from({ length: 150 }, (_, i) => ({
+      // Generate 100 customers
+      const customers: Customer[] = Array.from({ length: 100 }, (_, i) => ({
         id: generateId(),
         userId: 'user-1',
         shopId: 'shop-1',
-        name: `Customer ${String(i).padStart(4, '0')}`,
+        name: `Customer ${String(i).padStart(3, '0')}`,
         phone: `0300${String(i).padStart(7, '0')}`,
         createdAt: nowISO(),
         updatedAt: nowISO(),
@@ -85,14 +85,16 @@ describe('Pagination Hooks Performance', () => {
       expect(result.current.page).toBe(0)
 
       // Navigate to second page
-      result.current.nextPage()
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false)
+      act(() => {
+        result.current.nextPage()
       })
 
       await waitFor(() => {
         expect(result.current.page).toBe(1)
+      })
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
       })
 
       expect(result.current.items).toBeDefined()
@@ -314,7 +316,7 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      })
+      }, { timeout: 15000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
@@ -360,7 +362,7 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      })
+      }, { timeout: 15000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)

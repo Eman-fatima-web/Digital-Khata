@@ -845,6 +845,7 @@ function AI() {
     NAVIGATE: t('ai.actionNavigate'),
     SET_THEME: t('ai.actionSetTheme'),
     SET_LANGUAGE: t('ai.actionSetLanguage'),
+    SET_NOTIFICATION_PREFS: t('nav.notifications'),
   }), [t])
 
   const buildRows = (proposal: ActionProposal) => {

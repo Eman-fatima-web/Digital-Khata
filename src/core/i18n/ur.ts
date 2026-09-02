@@ -477,4 +477,10 @@ export const ur = {
     restoring: 'بحال ہو رہا ہے...',
     noPhone: 'کوئی فون نہیں',
   },
+  audit: {
+    title: 'آڈٹ لاگ',
+    description: 'سسٹم کی حالیہ سرگرمیاں اور AI کے اقدامات دیکھیں',
+    recentActivities: 'حالیہ سرگرمیاں',
+    noLogs: 'کوئی آڈٹ لاگ نہیں ملا',
+  },
 }

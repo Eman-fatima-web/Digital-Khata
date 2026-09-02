@@ -3,6 +3,10 @@ import type { Request, Response, NextFunction } from 'express'
 const CSRF_HEADER = 'x-csrf-token'
 const CSRF_SECRET = process.env.CSRF_SECRET || 'digital-khata-csrf-secret-2024'
 
+if (!process.env.CSRF_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('CSRF_SECRET is required in production')
+}
+
 export function generateCsrfToken(): string {
   const timestamp = Date.now().toString(36)
   const random = Math.random().toString(36).slice(2)

@@ -38,6 +38,13 @@ const verificationRateLimits = new Map<string, { count: number; resetAt: number 
 
 function checkVerificationRateLimit(userId: string): boolean {
   const now = Date.now()
+  if (verificationRateLimits.size > 100) {
+    for (const [id, item] of verificationRateLimits.entries()) {
+      if (now > item.resetAt) {
+        verificationRateLimits.delete(id)
+      }
+    }
+  }
   const entry = verificationRateLimits.get(userId)
   if (!entry || now > entry.resetAt) {
     verificationRateLimits.set(userId, { count: 1, resetAt: now + 3600_000 })

@@ -16,6 +16,9 @@ import { auditRouter } from './routes/audit.js'
 import { checkOllamaHealth } from './providers/OllamaProvider.js'
 import { getAIProvider } from './providers/index.js'
 import { startScheduler, stopScheduler, getScheduledJobs } from './services/scheduler.js'
+import { isRedisConfigured, isRedisAvailable } from './services/redis.js'
+import { startWorkers, stopWorkers, getWorkerStatus } from './workers/index.js'
+import { getQueueMetrics } from './queues/index.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -59,23 +62,58 @@ app.get('/health/live', (req, res) => {
 })
 
 app.get('/health/ready', async (req, res) => {
-  try {
-    // Check database connectivity if available
-    if (process.env.DATABASE_URL) {
+  const timestamp = new Date().toISOString()
+  const checks: Record<string, { status: 'healthy' | 'degraded' | 'unavailable'; detail?: string }> = {}
+
+  // Application — this handler running is itself proof the app is up
+  checks.application = { status: 'healthy' }
+
+  // PostgreSQL
+  if (process.env.DATABASE_URL) {
+    try {
       const { pool } = await import('./database/index.js')
       await pool.query('SELECT 1')
-      res.json({ status: 'ready', database: 'connected', timestamp: new Date().toISOString() })
-    } else {
-      res.json({ status: 'ready', database: 'not configured', timestamp: new Date().toISOString() })
+      checks.postgresql = { status: 'healthy' }
+    } catch (err) {
+      checks.postgresql = { status: 'unavailable', detail: err instanceof Error ? err.message : 'connection failed' }
     }
-  } catch {
-    res.status(503).json({ 
-      status: 'not ready', 
-      database: 'disconnected',
-      error: 'Database connection failed',
-      timestamp: new Date().toISOString()
-    })
+  } else {
+    checks.postgresql = { status: 'degraded', detail: 'not configured (DATABASE_URL missing)' }
   }
+
+  // Redis + queue workers
+  if (isRedisConfigured()) {
+    const redisOk = await isRedisAvailable()
+    checks.redis = redisOk ? { status: 'healthy' } : { status: 'unavailable', detail: 'configured but not reachable' }
+    const workerStatus = getWorkerStatus()
+    checks.workers = workerStatus.started
+      ? { status: 'healthy', detail: `${workerStatus.count} worker(s): ${workerStatus.names.join(', ')}` }
+      : { status: 'degraded', detail: 'not started' }
+  } else {
+    checks.redis = { status: 'degraded', detail: 'not configured (REDIS_URL missing) — running without background queues' }
+    checks.workers = { status: 'degraded', detail: 'disabled without Redis' }
+  }
+
+  const anyUnavailable = Object.values(checks).some((c) => c.status === 'unavailable')
+  const allHealthy = Object.values(checks).every((c) => c.status === 'healthy')
+  const overall = anyUnavailable ? 'unavailable' : allHealthy ? 'healthy' : 'degraded'
+
+  res.status(anyUnavailable ? 503 : 200).json({
+    status: overall,
+    checks,
+    timestamp,
+  })
+})
+
+// Queue metrics — safe operational counters only (no job payloads)
+app.get('/health/queues', async (req, res) => {
+  const authHeader = req.headers.authorization
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  const metrics = await getQueueMetrics()
+  res.json({ queues: metrics, workers: getWorkerStatus(), timestamp: new Date().toISOString() })
 })
 
 // AI health/status — public endpoint (no auth required)
@@ -122,7 +160,7 @@ app.use('/api/audit', auditRouter)
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error({ err }, 'Server error')
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   })
@@ -130,13 +168,14 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 app.listen(PORT, () => {
   logger.info({ port: PORT }, `Digital Khata Server running on port ${PORT}`)
+  startWorkers() // Central worker lifecycle — only starts when Redis is configured
   startScheduler()
 })
 
 function shutdown() {
   logger.info('Shutting down...')
   stopScheduler()
-  process.exit(0)
+  void stopWorkers().finally(() => process.exit(0))
 }
 
 process.on('SIGTERM', shutdown)

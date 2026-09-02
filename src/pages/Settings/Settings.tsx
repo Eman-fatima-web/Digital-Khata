@@ -48,7 +48,7 @@ function SectionHeader({ children }: { children: string }) {
 
 function Settings() {
   const { t } = useTranslation()
-  const { pinEnabled, setPinEnabled, lock, theme, setTheme, toggleTheme } = useApp()
+  const { pinEnabled, setPinEnabled, lock, theme, setTheme } = useApp()
   const { isAuthenticated, user, logout, sendVerification } = useAuth()
   const owner = useOwner()
   const { prefs, updatePrefs } = useNotificationPreferences()

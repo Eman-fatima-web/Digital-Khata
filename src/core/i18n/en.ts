@@ -477,6 +477,12 @@ export const en = {
     restoring: 'Restoring...',
     noPhone: 'No phone',
   },
+  audit: {
+    title: 'Audit Log',
+    description: 'View recent system activities and AI actions',
+    recentActivities: 'Recent Activities',
+    noLogs: 'No audit logs found',
+  },
 } as const
 
 export type Translation = typeof en
