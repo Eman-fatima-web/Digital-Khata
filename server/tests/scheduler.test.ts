@@ -22,7 +22,7 @@ vi.mock('node-cron', () => ({
 
 describe('Scheduler', () => {
   it('starts and reports active jobs', async () => {
-    const { startScheduler, getScheduledJobs, stopScheduler } = await import('../services/scheduler.js')
+    const { startScheduler, getScheduledJobs, stopScheduler } = await import('../services/scheduler')
 
     startScheduler()
     const jobs = getScheduledJobs()

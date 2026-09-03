@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:server": "tsc -p server/tsconfig.json",
+    "test:watch": "vitest",
+    "start:server": "node server/dist/index.js",
+    "dev:server": "tsx watch server/index.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -52,3 +56,4 @@
     "vitest": "^4.1.11"
   }
 }
+

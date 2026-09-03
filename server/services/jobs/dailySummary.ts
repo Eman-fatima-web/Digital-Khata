@@ -3,10 +3,12 @@ import { sendMail } from '../../config/mail.js'
 import { buildDailySummaryEmail, type DailySummaryData } from './emailTemplates.js'
 import { createChildLogger } from '../logger.js'
 
+
+
 const log = createChildLogger({ module: 'daily-summary-job' })
 
 interface BusinessWithEmail {
-  id: string
+  id: string  
   name: string
   ownerEmail: string
 }

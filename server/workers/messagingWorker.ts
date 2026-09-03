@@ -1,5 +1,5 @@
 import { Worker, type Job } from 'bullmq'
-import { getRedisUrl } from '../services/redis.js'
+import { getRedisUrl } from '../services/redis'
 import { createChildLogger } from '../services/logger.js'
 import { notificationService } from '../services/messaging/index.js'
 import type { MessageChannel } from '../services/messaging/types.js'

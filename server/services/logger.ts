@@ -1,22 +1,29 @@
-import pino from 'pino'
+import pino from 'pino';
 
-const level = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug')
+// pino-pretty's worker transport cannot resolve its target inside vitest's
+// worker processes, so we only use it in normal dev (not tests, not prod).
+const usePrettyTransport = process.env.NODE_ENV !== 'production' && process.env.VITEST !== 'true';
 
-export const logger = pino({
-  level,
-  ...(process.env.NODE_ENV !== 'production' && {
-    transport: {
-      target: 'pino/file',
-      options: { destination: 1 },
-    },
-  }),
-  serializers: {
-    err: pino.stdSerializers.err,
-    req: pino.stdSerializers.req,
-    res: pino.stdSerializers.res,
-  },
-})
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  base: { pid: process.pid },
+  timestamp: pino.stdTimeFunctions.isoTime,
+  transport: usePrettyTransport
+    ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:standard',
+          ignore: 'pid,hostname',
+        },
+      }
+    : undefined,
+});
 
-export function createChildLogger(bindings: Record<string, unknown>): pino.Logger {
-  return logger.child(bindings)
+export function createChildLogger(options: Record<string, any>): pino.Logger {
+  return logger.child(options);
 }
+
+export { logger };
+
+export default logger;

@@ -1,91 +1,51 @@
-import { Redis } from 'ioredis'
-import { createChildLogger } from './logger.js'
+import { Redis } from 'ioredis';
 
-const log = createChildLogger({ module: 'redis' })
-
-let redisClient: Redis | null = null
-
-export function getRedisUrl(): string | undefined {
-  return process.env.REDIS_URL
-}
+let redis: Redis | null = null;
 
 export function isRedisConfigured(): boolean {
-  return Boolean(getRedisUrl())
+  return Boolean(process.env.REDIS_URL || process.env.REDIS_HOST);
 }
 
-export function getRedisClient(): Redis | null {
-  const url = getRedisUrl()
-  if (!url) {
-    return null
+export function getRedisUrl(): string {
+  if (!isRedisConfigured()) {
+    return '';
   }
+  return process.env.REDIS_URL || `redis://${process.env.REDIS_HOST}:6379`;
+}
 
-  if (!redisClient) {
-    try {
-      redisClient = new Redis(url, {
-        maxRetriesPerRequest: null, // Required by BullMQ
-        enableReadyCheck: true,
-        connectTimeout: 5000,
-        lazyConnect: true,
-        retryStrategy(times) {
-          if (times > 10) {
-            log.warn({ times }, 'Redis connection retry threshold reached')
-            return null // Stop retrying after 10 attempts
-          }
-          return Math.min(times * 200, 2000)
-        },
-      })
-
-      redisClient.on('connect', () => {
-        log.info('Connected to Redis')
-      })
-
-      redisClient.on('ready', () => {
-        log.info('Redis connection ready')
-      })
-
-      redisClient.on('error', (err) => {
-        log.warn({ err: err.message }, 'Redis connection error')
-      })
-
-      redisClient.on('end', () => {
-        log.info('Redis connection closed')
-      })
-    } catch (err) {
-      log.error({ err }, 'Failed to initialize Redis client')
-      return null
-    }
+export function getRedisClient(): Redis {
+  if (!redis) {
+    redis = new Redis(getRedisUrl(), {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      retryStrategy: (times) => {
+        if (times > 10) {
+          return null;
+        }
+        return Math.min(times * 100, 3000);
+      },
+    });
   }
-
-  return redisClient
+  return redis;
 }
 
 export async function isRedisAvailable(): Promise<boolean> {
-  const client = getRedisClient()
-  if (!client) return false
-
+  if (!isRedisConfigured() || !redis) {
+    return false;
+  }
   try {
-    if (client.status === 'ready' || client.status === 'connect') {
-      await client.ping()
-      return true
-    }
-    await client.connect()
-    await client.ping()
-    return true
-  } catch (err) {
-    log.warn({ err }, 'Redis ping health check failed')
-    return false
+    const pong = await redis.ping();
+    return pong === 'PONG';
+  } catch {
+    return false;
   }
 }
 
 export async function closeRedis(): Promise<void> {
-  if (redisClient) {
-    try {
-      await redisClient.quit()
-    } catch {
-      redisClient.disconnect()
-    } finally {
-      redisClient = null
-      log.info('Redis client shut down cleanly')
-    }
+  if (redis) {
+    await redis.quit();
+    redis = null;
   }
 }
+
+export default getRedisClient;

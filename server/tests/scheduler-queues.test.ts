@@ -6,7 +6,7 @@ vi.mock('../services/logger.js', () => ({
 }))
 
 const mockEnqueueJob = vi.fn()
-vi.mock('../queues/index.js', () => ({
+vi.mock('../queues/index', () => ({
   enqueueJob: (...args: unknown[]) => mockEnqueueJob(...args),
 }))
 
@@ -47,7 +47,7 @@ describe('Scheduler (Integration 7)', () => {
   })
 
   it('starts all four jobs and stops them cleanly', async () => {
-    const { startScheduler, stopScheduler, getScheduledJobs } = await import('../services/scheduler.js')
+    const { startScheduler, stopScheduler, getScheduledJobs } = await import('../services/scheduler')
     startScheduler()
     const jobs = getScheduledJobs()
     expect(jobs).toHaveLength(4)
@@ -59,7 +59,7 @@ describe('Scheduler (Integration 7)', () => {
   })
 
   it('ignores duplicate startScheduler calls (no double cron registration)', async () => {
-    const { startScheduler } = await import('../services/scheduler.js')
+    const { startScheduler } = await import('../services/scheduler')
     startScheduler()
     startScheduler()
     expect(cronTasks).toHaveLength(4)
@@ -72,7 +72,7 @@ describe('Scheduler (Integration 7)', () => {
 
     it('reports queue mode and enqueues with deterministic dedupe jobId', async () => {
       mockEnqueueJob.mockResolvedValue({ success: true, jobId: 'dailySummary-2026-01-01' })
-      const { startScheduler, runScheduledJobNow, getSchedulerMode } = await import('../services/scheduler.js')
+      const { startScheduler, runScheduledJobNow, getSchedulerMode } = await import('../services/scheduler')
       startScheduler()
       expect(getSchedulerMode()).toBe('queue')
 
@@ -87,14 +87,14 @@ describe('Scheduler (Integration 7)', () => {
 
     it('never executes the job locally in queue mode', async () => {
       mockEnqueueJob.mockResolvedValue({ success: true, jobId: 'x' })
-      const { runScheduledJobNow } = await import('../services/scheduler.js')
+      const { runScheduledJobNow } = await import('../services/scheduler')
       await runScheduledJobNow('dailySummary')
       expect(mockRunDaily).not.toHaveBeenCalled()
     })
 
     it('routes overdueReminders to the messaging queue', async () => {
       mockEnqueueJob.mockResolvedValue({ success: true, jobId: 'x' })
-      const { runScheduledJobNow } = await import('../services/scheduler.js')
+      const { runScheduledJobNow } = await import('../services/scheduler')
       await runScheduledJobNow('overdueReminders')
       expect(mockEnqueueJob.mock.calls[0][0]).toBe('messaging')
       expect(mockEnqueueJob.mock.calls[0][1]).toBe('overdue-reminders')
@@ -103,7 +103,7 @@ describe('Scheduler (Integration 7)', () => {
 
   describe('local fallback mode (Redis unconfigured)', () => {
     it('reports local mode and executes in-process', async () => {
-      const { startScheduler, runScheduledJobNow, getSchedulerMode, resetSchedulerForTests } = await import('../services/scheduler.js')
+      const { startScheduler, runScheduledJobNow, getSchedulerMode, resetSchedulerForTests } = await import('../services/scheduler')
       startScheduler()
       expect(getSchedulerMode()).toBe('local')
 
@@ -115,7 +115,7 @@ describe('Scheduler (Integration 7)', () => {
     })
 
     it('does not execute the same scheduled job twice in one day', async () => {
-      const { runScheduledJobNow, resetSchedulerForTests } = await import('../services/scheduler.js')
+      const { runScheduledJobNow, resetSchedulerForTests } = await import('../services/scheduler')
       mockRunOverdue.mockResolvedValue({ businessesProcessed: 0, totalSent: 0, totalSkipped: 0, totalFailed: 0 })
 
       await runScheduledJobNow('overdueReminders')
@@ -127,7 +127,7 @@ describe('Scheduler (Integration 7)', () => {
     })
 
     it('duplicate guard is per-job, not global', async () => {
-      const { runScheduledJobNow, resetSchedulerForTests } = await import('../services/scheduler.js')
+      const { runScheduledJobNow, resetSchedulerForTests } = await import('../services/scheduler')
       mockRunDaily.mockResolvedValue({ sent: 0, failed: 0, skipped: 0 })
       mockRunOverdue.mockResolvedValue({ businessesProcessed: 0, totalSent: 0, totalSkipped: 0, totalFailed: 0 })
 

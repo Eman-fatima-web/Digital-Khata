@@ -48,24 +48,24 @@ describe('Redis + queues (Integration 7)', () => {
 
   describe('Redis unavailable / unconfigured', () => {
     it('reports Redis as not configured without REDIS_URL', async () => {
-      const { isRedisConfigured } = await import('../services/redis.js')
+      const { isRedisConfigured } = await import('../services/redis')
       expect(isRedisConfigured()).toBe(false)
     })
 
     it('getQueue returns null and app does not crash', async () => {
-      const { getQueue } = await import('../queues/index.js')
+      const { getQueue } = await import('../queues/index')
       expect(getQueue('email')).toBeNull()
     })
 
     it('enqueueJob returns controlled failure without throwing', async () => {
-      const { enqueueJob } = await import('../queues/index.js')
+      const { enqueueJob } = await import('../queues/index')
       const result = await enqueueJob('email', 'send-email', { type: 'send-email' })
       expect(result.success).toBe(false)
       expect(result.jobId).toBeUndefined()
     })
 
     it('getQueueMetrics returns zeroed metrics when unconfigured', async () => {
-      const { getQueueMetrics } = await import('../queues/index.js')
+      const { getQueueMetrics } = await import('../queues/index')
       const metrics = await getQueueMetrics()
       expect(Object.keys(metrics).sort()).toEqual(['email', 'messaging', 'sync'])
       for (const m of Object.values(metrics)) {
@@ -75,7 +75,7 @@ describe('Redis + queues (Integration 7)', () => {
 
     it('exposes only safe operational metrics (no payloads)', async () => {
       process.env.REDIS_URL = 'redis://localhost:6379'
-      const { getQueueMetrics } = await import('../queues/index.js')
+      const { getQueueMetrics } = await import('../queues/index')
       const metrics = await getQueueMetrics()
       const serialized = JSON.stringify(metrics)
       expect(serialized).not.toContain('html')
@@ -90,12 +90,12 @@ describe('Redis + queues (Integration 7)', () => {
     })
 
     it('reports Redis as configured', async () => {
-      const { isRedisConfigured } = await import('../services/redis.js')
+      const { isRedisConfigured } = await import('../services/redis')
       expect(isRedisConfigured()).toBe(true)
     })
 
     it('creates each queue exactly once (no duplicate initialization)', async () => {
-      const { getQueue } = await import('../queues/index.js')
+      const { getQueue } = await import('../queues/index')
       const a = getQueue('email')
       const b = getQueue('email')
       expect(a).not.toBeNull()
@@ -108,7 +108,7 @@ describe('Redis + queues (Integration 7)', () => {
     })
 
     it('applies retry/backoff and retention defaults', async () => {
-      const { getQueue } = await import('../queues/index.js')
+      const { getQueue } = await import('../queues/index')
       const queue = getQueue('messaging')!
       const djo = queue.opts.defaultJobOptions as Record<string, any>
       expect(djo.attempts).toBe(3)
@@ -118,21 +118,21 @@ describe('Redis + queues (Integration 7)', () => {
     })
 
     it('enqueues successfully and returns jobId', async () => {
-      const { enqueueJob } = await import('../queues/index.js')
+      const { enqueueJob } = await import('../queues/index')
       const result = await enqueueJob('sync', 'sync-apply', { businessId: 'b1', action: { table: 'sales', recordId: 'r1' } })
       expect(result.success).toBe(true)
       expect(result.jobId).toBe('job-1')
     })
 
     it('enqueued jobs carry deterministic jobId for scheduler dedupe', async () => {
-      const { enqueueJob } = await import('../queues/index.js')
+      const { enqueueJob } = await import('../queues/index')
       await enqueueJob('email', 'daily-summary', { type: 'daily-summary' }, { jobId: 'dailySummary-2026-01-01' })
       const q = mockQueueInstances.find((x) => x.name === 'email')
       expect(q.added[0].opts.jobId).toBe('dailySummary-2026-01-01')
     })
 
     it('rejects non-serializable payloads with controlled failure', async () => {
-      const { enqueueJob } = await import('../queues/index.js')
+      const { enqueueJob } = await import('../queues/index')
       const circular: Record<string, unknown> = {}
       circular['self'] = circular
       const result = await enqueueJob('email', 'send-email', circular)
@@ -140,7 +140,7 @@ describe('Redis + queues (Integration 7)', () => {
     })
 
     it('rejects oversized payloads (bounded job size)', async () => {
-      const { enqueueJob } = await import('../queues/index.js')
+      const { enqueueJob } = await import('../queues/index')
       const huge = { html: 'x'.repeat(300 * 1024) }
       const result = await enqueueJob('email', 'send-email', huge)
       expect(result.success).toBe(false)

@@ -82,24 +82,24 @@ describe('Workers (Integration 7)', () => {
 
   describe('disabled without Redis', () => {
     it('createEmailWorker returns null and never touches BullMQ', async () => {
-      const { createEmailWorker } = await import('../workers/emailWorker.js')
+      const { createEmailWorker } = await import('../workers/emailWorker')
       const { Worker } = await import('bullmq')
       expect(createEmailWorker()).toBeNull()
       expect((Worker as any).instances).toHaveLength(0)
     })
 
     it('createMessagingWorker returns null', async () => {
-      const { createMessagingWorker } = await import('../workers/messagingWorker.js')
+      const { createMessagingWorker } = await import('../workers/messagingWorker')
       expect(createMessagingWorker()).toBeNull()
     })
 
     it('createSyncWorker returns null', async () => {
-      const { createSyncWorker } = await import('../workers/syncWorker.js')
+      const { createSyncWorker } = await import('../workers/syncWorker')
       expect(createSyncWorker()).toBeNull()
     })
 
     it('startWorkers is a safe no-op with zero workers', async () => {
-      const { startWorkers, getWorkerStatus } = await import('../workers/index.js')
+      const { startWorkers, getWorkerStatus } = await import('../workers/index')
       const result = startWorkers()
       expect(result.started).toBe(false)
       expect(result.workerCount).toBe(0)
@@ -115,14 +115,14 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('creates email worker with configurable concurrency', async () => {
-      const { createEmailWorker } = await import('../workers/emailWorker.js')
+      const { createEmailWorker } = await import('../workers/emailWorker')
       const worker = createEmailWorker(3)
       expect(worker).not.toBeNull()
       expect(worker!.opts.concurrency).toBe(3)
     })
 
     it('creates all three workers via central manager, exactly once each', async () => {
-      const { startWorkers, getWorkerStatus } = await import('../workers/index.js')
+      const { startWorkers, getWorkerStatus } = await import('../workers/index')
       const result = startWorkers()
       expect(result.started).toBe(true)
       expect(result.workerCount).toBe(3)
@@ -135,7 +135,7 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('graceful shutdown closes all workers cleanly', async () => {
-      const { startWorkers, stopWorkers, getWorkerStatus } = await import('../workers/index.js')
+      const { startWorkers, stopWorkers, getWorkerStatus } = await import('../workers/index')
       startWorkers()
       await stopWorkers()
       expect(getWorkerStatus().started).toBe(false)
@@ -144,7 +144,7 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('stopWorkers is a safe no-op when never started', async () => {
-      const { stopWorkers } = await import('../workers/index.js')
+      const { stopWorkers } = await import('../workers/index')
       await expect(stopWorkers()).resolves.toBeUndefined()
     })
   })
@@ -156,7 +156,7 @@ describe('Workers (Integration 7)', () => {
 
     it('routes send-email jobs through the existing sendMail', async () => {
       mockSendMail.mockResolvedValue(true)
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       const result = await processEmailJob(makeJob({
         type: 'send-email', to: 'a@b.com', subject: 'Hi', html: '<p>Hi</p>',
       }) as any)
@@ -166,7 +166,7 @@ describe('Workers (Integration 7)', () => {
 
     it('returns controlled skipped result when sendMail reports false (no fake success)', async () => {
       mockSendMail.mockResolvedValue(false)
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       const result = await processEmailJob(makeJob({
         type: 'send-email', to: 'a@b.com', subject: 'Hi', html: '<p>Hi</p>',
       }) as any)
@@ -175,14 +175,14 @@ describe('Workers (Integration 7)', () => {
 
     it('routes daily-summary job to existing daily summary service', async () => {
       mockRunDaily.mockResolvedValue({ sent: 1, failed: 0, skipped: 0 })
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       const result = await processEmailJob(makeJob({ type: 'daily-summary' }) as any)
       expect(mockRunDaily).toHaveBeenCalledOnce()
       expect(result).toEqual({ sent: 1, failed: 0, skipped: 0 })
     })
 
     it('routes weekly and monthly summary jobs to existing services', async () => {
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       await processEmailJob(makeJob({ type: 'weekly-summary' }) as any)
       await processEmailJob(makeJob({ type: 'monthly-summary' }) as any)
       expect(mockRunWeekly).toHaveBeenCalledOnce()
@@ -190,12 +190,12 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('fails unknown email job types with a clear error (no silent pretend-success)', async () => {
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       await expect(processEmailJob(makeJob({ type: 'bogus' }) as any)).rejects.toThrow('Unknown email job type')
     })
 
     it('rejects send-email jobs missing required fields', async () => {
-      const { processEmailJob } = await import('../workers/emailWorker.js')
+      const { processEmailJob } = await import('../workers/emailWorker')
       await expect(processEmailJob(makeJob({ type: 'send-email', to: 'a@b.com' }) as any)).rejects.toThrow('requires to, subject and html')
     })
   })
@@ -207,7 +207,7 @@ describe('Workers (Integration 7)', () => {
 
     it('routes send-message jobs through the existing notificationService', async () => {
       mockNotificationSend.mockResolvedValue({ messageId: 'm1', channel: 'whatsapp', status: 'queued', provider: 'whatsapp', sentAt: new Date().toISOString() })
-      const { processMessagingJob } = await import('../workers/messagingWorker.js')
+      const { processMessagingJob } = await import('../workers/messagingWorker')
       const result = await processMessagingJob(makeJob({
         type: 'send-message', channel: 'whatsapp', to: '+923001234567', body: 'Reminder', businessId: 'b1', customerId: 'c1',
       }) as any)
@@ -218,7 +218,7 @@ describe('Workers (Integration 7)', () => {
 
     it('throws (job retry) when provider reports failed delivery', async () => {
       mockNotificationSend.mockResolvedValue({ messageId: 'm2', channel: 'sms', status: 'failed', provider: 'sms', errorMessage: 'SMS API not configured', sentAt: new Date().toISOString() })
-      const { processMessagingJob } = await import('../workers/messagingWorker.js')
+      const { processMessagingJob } = await import('../workers/messagingWorker')
       await expect(processMessagingJob(makeJob({
         type: 'send-message', channel: 'sms', to: '+923001234567', body: 'Hi', businessId: 'b1',
       }) as any)).rejects.toThrow('SMS API not configured')
@@ -226,19 +226,19 @@ describe('Workers (Integration 7)', () => {
 
     it('routes overdue-reminders job to existing reminder job service', async () => {
       mockRunOverdue.mockResolvedValue({ businessesProcessed: 1, totalSent: 1, totalSkipped: 0, totalFailed: 0 })
-      const { processMessagingJob } = await import('../workers/messagingWorker.js')
+      const { processMessagingJob } = await import('../workers/messagingWorker')
       const result = await processMessagingJob(makeJob({ type: 'overdue-reminders' }) as any)
       expect(mockRunOverdue).toHaveBeenCalledOnce()
       expect(result.totalSent).toBe(1)
     })
 
     it('rejects invalid channels', async () => {
-      const { processMessagingJob } = await import('../workers/messagingWorker.js')
+      const { processMessagingJob } = await import('../workers/messagingWorker')
       await expect(processMessagingJob(makeJob({ type: 'send-message', channel: 'fax' }) as any)).rejects.toThrow('Invalid or missing channel')
     })
 
     it('rejects messages with unbounded body size', async () => {
-      const { processMessagingJob } = await import('../workers/messagingWorker.js')
+      const { processMessagingJob } = await import('../workers/messagingWorker')
       await expect(processMessagingJob(makeJob({
         type: 'send-message', channel: 'sms', to: '+923001234567', body: 'x'.repeat(10_000), businessId: 'b1',
       }) as any)).rejects.toThrow('exceeds maximum allowed size')
@@ -253,7 +253,7 @@ describe('Workers (Integration 7)', () => {
 
     it('delegates to the shared applyAction with tenant context', async () => {
       mockApplyAction.mockResolvedValue(null)
-      const { processSyncJob } = await import('../workers/syncWorker.js')
+      const { processSyncJob } = await import('../workers/syncWorker')
       const action = { id: 'a1', table: 'sales', recordId: 'r1', operation: 'create' as const, payload: { version: 1 }, createdAt: new Date().toISOString(), attempts: 0 }
       const result = await processSyncJob(makeJob({ businessId: 'biz-1', action }) as any)
       expect(mockApplyAction).toHaveBeenCalledWith('biz-1', action)
@@ -261,14 +261,14 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('refuses to apply sync actions without tenant isolation context', async () => {
-      const { processSyncJob } = await import('../workers/syncWorker.js')
+      const { processSyncJob } = await import('../workers/syncWorker')
       await expect(processSyncJob(makeJob({ action: { table: 'sales', recordId: 'r1' } }) as any)).rejects.toThrow('missing businessId')
       expect(mockApplyAction).not.toHaveBeenCalled()
     })
 
     it('reports conflicts without swallowing them', async () => {
       mockApplyAction.mockResolvedValue({ table: 'sales', recordId: 'r1', local: {}, remote: {} })
-      const { processSyncJob } = await import('../workers/syncWorker.js')
+      const { processSyncJob } = await import('../workers/syncWorker')
       const result = await processSyncJob(makeJob({
         businessId: 'biz-1',
         action: { id: 'a1', table: 'sales', recordId: 'r1', operation: 'update', payload: { version: 1 }, createdAt: '', attempts: 0 },
@@ -277,13 +277,13 @@ describe('Workers (Integration 7)', () => {
     })
 
     it('rejects oversized sync payloads', async () => {
-      const { processSyncJob } = await import('../workers/syncWorker.js')
+      const { processSyncJob } = await import('../workers/syncWorker')
       const bigAction = { id: 'a1', table: 'sales', recordId: 'r1', operation: 'create', payload: { blob: 'x'.repeat(200_000) }, createdAt: '', attempts: 0 }
       await expect(processSyncJob(makeJob({ businessId: 'b1', action: bigAction }) as any)).rejects.toThrow('exceeds maximum allowed size')
     })
 
     it('creates sync worker with lower default concurrency (safety)', async () => {
-      const { createSyncWorker } = await import('../workers/syncWorker.js')
+      const { createSyncWorker } = await import('../workers/syncWorker')
       const worker = createSyncWorker()
       expect(worker).not.toBeNull()
       expect(worker!.opts.concurrency).toBe(2)

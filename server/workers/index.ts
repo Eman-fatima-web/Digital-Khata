@@ -1,6 +1,6 @@
 import type { Worker } from 'bullmq'
 import { createChildLogger } from '../services/logger.js'
-import { isRedisConfigured } from '../services/redis.js'
+import { isRedisConfigured } from '../services/redis'
 import { createEmailWorker } from './emailWorker.js'
 import { createMessagingWorker } from './messagingWorker.js'
 import { createSyncWorker } from './syncWorker.js'
