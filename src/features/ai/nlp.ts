@@ -6,6 +6,11 @@ const STOPWORDS = new Set([
   'are', 'was', 'were', 'my', 'i', 'show', 'tell', 'give', 'what', 'how', 'much',
   'many', 'please', 'and', 'on', 'at', 'do', 'does', 'did', 'has', 'have', 'can',
   'you', 'me', 'payment', 'receive', 'received', 'udhaar', 'balance',
+  'restore', 'recover', 'undelete', 'delete', 'remove', 'cancel', 'customer',
+  'customers', 'sale', 'sales', 'credit', 'add', 'created', 'create', 'record',
+  'records', 'change', 'update', 'edit', 'modify', 'send', 'remind', 'reminder',
+  'reminders', 'report', 'summary', 'outstanding', 'overdue', 'book', 'khata',
+  'detail', 'details', 'history', 'receive', 'collect', 'deposit', 'list',
   'ادا', 'ادائیگی', 'کی', 'کا', 'کے', 'کو', 'ہے', 'ہیں', 'میں', 'سے', 'نے', 'اور',
   'کر', 'کرو', 'کردو', 'کرلو', 'براہ', 'مہربانی', 'رقم', 'روپے', 'روپیہ', 'ہزار', 'لاکھ',
 ])
@@ -38,6 +43,19 @@ export type CustomerMatch =
   | { status: 'unique'; customer: Customer }
   | { status: 'ambiguous'; candidates: Customer[] }
   | { status: 'none' }
+
+/**
+ * Returns true when the input contains at least one non-stopword,
+ * non-numeric token — meaning the user likely mentioned a customer name
+ * even though no customer matched.
+ */
+export function hasNameTokens(input: string): boolean {
+  const normalizedInput = normalize(input)
+  const tokens = normalizedInput.split(' ').filter(
+    (token) => token.length > 1 && !STOPWORDS.has(token) && !/^\d+(\.\d+)?$/.test(token),
+  )
+  return tokens.length > 0
+}
 
 function comparable(value: string): string {
   return normalize(value)

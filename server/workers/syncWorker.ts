@@ -5,7 +5,7 @@ import { applyAction, type SyncActionPayload } from '../services/sync/applySyncA
 
 const log = createChildLogger({ module: 'sync-worker' })
 
-/**
+/*
  * Sync job payload: a single client sync action to apply server-side.
  * The worker delegates to the SAME applyAction implementation used by the
  * REST push endpoint — repositories, conflict detection, soft-delete

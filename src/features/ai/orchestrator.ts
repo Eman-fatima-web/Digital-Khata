@@ -118,6 +118,18 @@ function updateContext(
   let lastReportType = context.lastReportType
 
   // If the result has a proposal with a customer, update context
+  // But first: if the active customer from context no longer exists in the snapshot
+  // (was deleted), we must clear it to prevent stale financial data references.
+  const activeStillExists = !context.activeCustomerId
+    || data.customers.some((c) => c.id === context.activeCustomerId)
+  if (!activeStillExists) {
+    activeCustomerId = undefined
+    activeCustomerName = undefined
+    lastCustomerId = undefined
+    lastCustomerName = undefined
+  }
+
+  // If the result has a proposal with a customer, update context
   if (result.type === 'proposal' && result.proposal.customerId) {
     lastCustomerId = result.proposal.customerId
     lastCustomerName = result.proposal.customerName

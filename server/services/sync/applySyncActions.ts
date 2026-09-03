@@ -123,6 +123,10 @@ async function insertFromPayload(
       )
       break
     case 'udhaar':
+      // Never link a tenant's udhaar to a customer owned by another business.
+      if (payload.customerId != null) {
+        await assertCustomerOwnership(businessId, payload.customerId as string)
+      }
       await query(
         `INSERT INTO udhaar (id, business_id, customer_id, description, amount, paid_amount, remaining_amount, due_date, is_deleted, sync_status, version, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
@@ -137,6 +141,13 @@ async function insertFromPayload(
       )
       break
     case 'payments':
+      // Never link a tenant's payment to a customer/udhaar owned by another business.
+      if (payload.customerId != null) {
+        await assertCustomerOwnership(businessId, payload.customerId as string)
+      }
+      if (payload.udhaarId != null) {
+        await assertUdhaarOwnership(businessId, payload.udhaarId as string)
+      }
       await query(
         `INSERT INTO payments (id, business_id, customer_id, udhaar_id, amount, method, date, is_deleted, sync_status, version, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
@@ -150,6 +161,9 @@ async function insertFromPayload(
       )
       break
     case 'sales':
+      if (payload.customerId != null) {
+        await assertCustomerOwnership(businessId, payload.customerId as string)
+      }
       await query(
         `INSERT INTO sales (id, business_id, customer_id, amount, description, date, is_deleted, sync_status, version, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -162,6 +176,32 @@ async function insertFromPayload(
         ],
       )
       break
+  }
+}
+
+/**
+ * Ensure the referenced customer belongs to the given business before linking
+ * financial records to it. If it does not exist in this business, the record
+ * cannot be created safely (the FK would fail anyway), so we reject it.
+ */
+async function assertCustomerOwnership(businessId: string, customerId: string): Promise<void> {
+  const result = await query(
+    `SELECT 1 FROM customers WHERE id = $1 AND business_id = $2`,
+    [customerId, businessId],
+  )
+  if (result.rows.length === 0) {
+    throw new Error('Referenced customer does not belong to this business')
+  }
+}
+
+/** Ensure the referenced udhaar belongs to the given business. */
+async function assertUdhaarOwnership(businessId: string, udhaarId: string): Promise<void> {
+  const result = await query(
+    `SELECT 1 FROM udhaar WHERE id = $1 AND business_id = $2`,
+    [udhaarId, businessId],
+  )
+  if (result.rows.length === 0) {
+    throw new Error('Referenced udhaar does not belong to this business')
   }
 }
 

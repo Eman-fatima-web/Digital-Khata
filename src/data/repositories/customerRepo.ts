@@ -2,6 +2,9 @@ import type { Customer } from '../../core/types'
 import { generateId, nowISO } from '../../lib/utils'
 import { db } from '../db/db'
 import { enqueueSyncAction } from './syncQueueRepo'
+import { deleteUdhaar, getUdhaarByCustomer, restoreUdhaar } from './udhaarRepo'
+import { deletePayment, getPaymentsByCustomer, restorePayment } from './paymentRepo'
+import { deleteSale, getSalesByCustomer, restoreSale } from './saleRepo'
 
 export async function addCustomer(
   input: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'syncStatus' | 'version' | 'userId' | 'shopId'>,
@@ -67,6 +70,20 @@ export async function deleteCustomer(id: string): Promise<void> {
     await db.customers.put(deleted)
     await enqueueSyncAction('customers', id, 'delete', deleted)
   })
+
+  // Cascade soft-delete related records
+  const relatedUdhaar = await getUdhaarByCustomer(id)
+  for (const entry of relatedUdhaar) {
+    await deleteUdhaar(entry.id)
+  }
+  const relatedPayments = await getPaymentsByCustomer(id)
+  for (const payment of relatedPayments) {
+    await deletePayment(payment.id)
+  }
+  const relatedSales = await getSalesByCustomer(id)
+  for (const sale of relatedSales) {
+    await deleteSale(sale.id)
+  }
 }
 
 export async function restoreCustomer(id: string): Promise<void> {
@@ -86,6 +103,21 @@ export async function restoreCustomer(id: string): Promise<void> {
     await db.customers.put(restored)
     await enqueueSyncAction('customers', id, 'update', restored)
   })
+
+  // Restore any soft-deleted children that were cascaded with this customer,
+  // so the customer's financial history is fully intact after restore.
+  const udhaars = await db.udhaar.where('customerId').equals(id).toArray()
+  for (const entry of udhaars) {
+    if (entry.isDeleted) await restoreUdhaar(entry.id)
+  }
+  const payments = await db.payments.where('customerId').equals(id).toArray()
+  for (const payment of payments) {
+    if (payment.isDeleted) await restorePayment(payment.id)
+  }
+  const sales = await db.sales.where('customerId').equals(id).toArray()
+  for (const sale of sales) {
+    if (sale.isDeleted) await restoreSale(sale.id)
+  }
 }
 
 export async function getDeletedCustomers(): Promise<Customer[]> {

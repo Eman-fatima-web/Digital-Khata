@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search,
@@ -12,6 +12,7 @@ import { useCustomers, useUdhaar } from '../../hooks/useKhataData'
 import { useOwner } from '../../hooks/useOwner'
 import { useTranslation } from '../../core/i18n'
 import { addCustomer } from '../../data/repositories/customerRepo'
+import { addUdhaar } from '../../data/repositories/udhaarRepo'
 import { formatCurrency, getInitials } from '../../lib/utils'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
@@ -28,6 +29,9 @@ function Customers() {
   const [search, setSearch] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [initialAmount, setInitialAmount] = useState('')
+  const [initialDescription, setInitialDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const customers = useCustomers()
@@ -50,22 +54,43 @@ function Customers() {
     )
   }, [customers, search])
 
+  const isModalOpen = searchParams.get('add') === 'true'
+  const openModal = useCallback(() => setSearchParams({ add: 'true' }), [setSearchParams])
+  const closeModal = useCallback(() => setSearchParams({}), [setSearchParams])
+
   if (customers === undefined || udhaar === undefined) {
     return <PageLoader />
   }
-
-  const isModalOpen = searchParams.get('add') === 'true'
-  const openModal = () => setSearchParams({ add: 'true' })
-  const closeModal = () => setSearchParams({})
 
   const handleAddCustomer = async () => {
     if (!name.trim()) return
 
     setIsSubmitting(true)
     try {
-      await addCustomer({ name: name.trim(), phone: phone.trim() }, owner)
+      const customer = await addCustomer(
+        { name: name.trim(), phone: phone.trim(), address: address.trim() || undefined },
+        owner,
+      )
+
+      // If an initial udhaar amount is provided, create the credit entry too
+      const amount = Number(initialAmount)
+      if (customer && amount > 0) {
+        await addUdhaar(
+          {
+            customerId: customer.id,
+            description: initialDescription.trim() || 'Initial credit',
+            amount,
+            dueDate: undefined,
+          },
+          owner,
+        )
+      }
+
       setName('')
       setPhone('')
+      setAddress('')
+      setInitialAmount('')
+      setInitialDescription('')
       closeModal()
     } finally {
       setIsSubmitting(false)
@@ -197,7 +222,7 @@ function Customers() {
         <div className="space-y-5">
           <div>
             <label htmlFor="customer-name" className="mb-2 block text-sm font-semibold text-ink-light">
-              {t('customers.customerName')}
+              {t('customers.customerName')} <span className="text-danger">*</span>
             </label>
             <input
               id="customer-name"
@@ -217,11 +242,62 @@ function Customers() {
             <input
               id="customer-phone"
               type="tel"
+              inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="03XX XXXXXXX"
               className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
             />
+          </div>
+
+          <div>
+            <label htmlFor="customer-address" className="mb-2 block text-sm font-semibold text-ink-light">
+              Address <span className="text-xs text-ink-muted">(optional)</span>
+            </label>
+            <input
+              id="customer-address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, city, area"
+              className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+            />
+          </div>
+
+          <div className="rounded-xl border border-surface-hairline bg-surface p-4">
+            <p className="text-sm font-semibold text-ink-light">Initial Udhaar <span className="text-xs font-normal text-ink-muted">(optional)</span></p>
+
+            <div className="mt-3 space-y-4">
+              <div>
+                <label htmlFor="customer-amount" className="mb-2 block text-sm font-semibold text-ink-light">
+                  Amount / Udhaar
+                </label>
+                <input
+                  id="customer-amount"
+                  type="number"
+                  inputMode="numeric"
+                  value={initialAmount}
+                  onChange={(e) => setInitialAmount(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="customer-product" className="mb-2 block text-sm font-semibold text-ink-light">
+                  Product / Purchase
+                </label>
+                <input
+                  id="customer-product"
+                  type="text"
+                  value={initialDescription}
+                  onChange={(e) => setInitialDescription(e.target.value)}
+                  placeholder="e.g. Rice, 20kg"
+                  className="h-12 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">

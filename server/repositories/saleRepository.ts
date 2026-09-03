@@ -9,6 +9,22 @@ export async function recordSale(
   date: string,
   customerId?: string
 ): Promise<Sale> {
+  // Tenant-safety: never attach a sale to a customer that is not owned by the
+  // authenticated business.
+  if (customerId) {
+    const customer = await query(
+      `SELECT 1 FROM customers WHERE id = $1 AND business_id = $2 AND is_deleted = FALSE`,
+      [customerId, businessId]
+    )
+    if (customer.rows.length === 0) {
+      throw new Error('Customer not found in this business')
+    }
+  }
+
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Amount must be a positive number')
+  }
+
   const result = await query(
     `INSERT INTO sales (business_id, customer_id, amount, description, date, sync_status, version)
      VALUES ($1, $2, $3, $4, $5, 'pending', 1)

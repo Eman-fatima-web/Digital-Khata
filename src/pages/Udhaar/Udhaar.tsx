@@ -28,7 +28,7 @@ function Udhaar() {
   const owner = useOwner()
 
   const [search, setSearch] = useState('')
-  const [customerId, setCustomerId] = useState('')
+  const [customerId, setCustomerId] = useState(() => searchParams.get('customer') ?? '')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -63,14 +63,20 @@ function Udhaar() {
 
   const filteredEntries = useMemo(() => {
     const list = udhaar ?? []
+    const filter = searchParams.get('filter')
     const query = search.toLowerCase()
-    if (!query) return list
-    return list.filter((entry) => {
+
+    const base = filter === 'overdue'
+      ? list.filter((e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < localDateKey())
+      : list
+
+    if (!query) return base
+    return base.filter((entry) => {
       const customer = customerMap.get(entry.customerId)
       const text = `${customer?.name ?? ''} ${customer?.phone ?? ''} ${entry.description}`.toLowerCase()
       return text.includes(query)
     })
-  }, [udhaar, search, customerMap])
+  }, [udhaar, search, customerMap, searchParams])
 
   if (customers === undefined || udhaar === undefined) {
     return <PageLoader />

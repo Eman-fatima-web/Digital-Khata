@@ -5,6 +5,7 @@ import {
   detectMethod,
   detectNewCustomer,
   extractAmount,
+  hasNameTokens,
   isInExpandedPeriod,
   isInPeriod,
   localToday,
@@ -43,6 +44,20 @@ export function runEngine(
       : undefined
   const clarify = (candidates: Customer[]) =>
     ({ type: 'clarification', text: r.clarifyCustomers(candidates.map((c) => c.name)) }) as AIResult
+  const notFound = (name: string) =>
+    ({ type: 'answer', text: r.customerNotFound(name) }) as AIResult
+
+  // When no customer matched, decide whether the user mentioned a name
+  // (→ "X is not in your Khata") or didn't mention one (→ "Which customer?")
+  const noCustomer = (): AIResult => {
+    if (match.status === 'none' && hasNameTokens(input)) {
+      const normalizedInput = normalize(input)
+      const tokens = normalizedInput.split(' ').filter((t) => t.length > 1)
+      const candidate = tokens.find((t) => data.customers.some((c) => normalize(c.name).includes(t))) ?? tokens[0]
+      if (candidate) return notFound(candidate)
+    }
+    return { type: 'clarification', text: r.askCustomer() }
+  }
 
   const udhaarFor = (id: string) => data.udhaar.filter((e) => e.customerId === id)
   const outstandingFor = (id: string) =>
@@ -67,7 +82,7 @@ export function runEngine(
   switch (intent) {
     case 'RECORD_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const amount = extractAmount(input)
       if (!amount || amount <= 0) return { type: 'clarification', text: r.askAmount() }
@@ -95,7 +110,7 @@ export function runEngine(
 
     case 'ADD_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const amount = extractAmount(input)
       if (!amount || amount <= 0) return { type: 'clarification', text: r.askAmount() }
@@ -113,7 +128,7 @@ export function runEngine(
 
     case 'DELETE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noPaymentsToDelete(customer.name) }
@@ -132,7 +147,7 @@ export function runEngine(
 
     case 'DELETE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = outstandingFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noUdhaarEntries(customer.name) }
@@ -158,7 +173,7 @@ export function runEngine(
 
     case 'SEND_REMINDER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const outstanding = outstandingFor(customer.id).reduce((sum, e) => sum + e.remainingAmount, 0)
       if (outstanding === 0) return { type: 'answer', text: r.noOutstanding(customer.name) }
@@ -322,7 +337,7 @@ export function runEngine(
 
     case 'CREDIT_ADVICE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       const outstanding = entries.reduce((sum, e) => sum + e.remainingAmount, 0)
@@ -858,7 +873,7 @@ export function runEngine(
 
     case 'DELETE_SALE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = salesFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noSalesToDelete(customer.name) }
@@ -876,7 +891,7 @@ export function runEngine(
 
     case 'RESTORE_CUSTOMER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const proposal: ActionProposal = {
         kind: 'RESTORE_CUSTOMER',
@@ -888,7 +903,7 @@ export function runEngine(
 
     case 'RESTORE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noDeletedUdhaar(customer.name) }
@@ -906,7 +921,7 @@ export function runEngine(
 
     case 'RESTORE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noDeletedPayment(customer.name) }
@@ -924,7 +939,7 @@ export function runEngine(
 
     case 'RESTORE_SALE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = salesFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noDeletedSale(customer.name) }
@@ -942,7 +957,7 @@ export function runEngine(
 
     case 'UPDATE_CUSTOMER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const proposal: ActionProposal = {
         kind: 'UPDATE_CUSTOMER',
@@ -958,7 +973,7 @@ export function runEngine(
 
     case 'UPDATE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noUdhaarToUpdate(customer.name) }
@@ -977,7 +992,7 @@ export function runEngine(
 
     case 'UPDATE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noPaymentToUpdate(customer.name) }

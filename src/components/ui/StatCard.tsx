@@ -12,6 +12,7 @@ interface StatCardProps {
   trend?: string
   prefix?: string
   decimals?: number
+  onClick?: () => void
 }
 
 export function StatCard({
@@ -22,11 +23,18 @@ export function StatCard({
   trend,
   prefix = 'Rs. ',
   decimals = 0,
+  onClick,
 }: StatCardProps) {
   const animatedValue = useCountUp(value, { decimals })
 
   return (
-    <Card className="p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md sm:p-6">
+    <Card
+      onClick={onClick}
+      className={cn(
+        'p-5 transition-all duration-200 sm:p-6',
+        onClick && 'cursor-pointer hover:-translate-y-1 hover:shadow-md',
+      )}
+    >
       <div className="flex items-start justify-between">
         <div
           className={cn(

@@ -11,6 +11,11 @@ type AuthTokens = {
     id: string
     businessId: string
     email: string
+    fullName?: string
+    phone?: string
+    address?: string
+    shopName?: string
+    cnic?: string
     emailVerified?: boolean
   }
 }
@@ -83,13 +88,19 @@ export async function login(email: string, password: string): Promise<AuthTokens
 /**
  * Register a new user
  */
-export async function register(email: string, password: string, businessName?: string): Promise<AuthTokens> {
+export async function register(
+  email: string,
+  password: string,
+  fullName?: string,
+  phone?: string,
+  businessName?: string,
+): Promise<AuthTokens> {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password, businessName }),
+    body: JSON.stringify({ email, password, fullName, phone, businessName }),
   })
 
   if (!response.ok) {
@@ -240,6 +251,38 @@ export async function verifyEmail(
  */
 export async function sendVerification(): Promise<{ sent: boolean }> {
   return authenticatedRequest('/api/auth/send-verification', { method: 'POST' })
+}
+
+/**
+ * Update user profile fields
+ */
+export async function updateProfile(
+  fields: Partial<Pick<AuthTokens['user'], 'fullName' | 'phone' | 'address' | 'shopName' | 'cnic'>>,
+): Promise<{ user: AuthTokens['user'] }> {
+  const result = await authenticatedRequest<{ user: AuthTokens['user'] }>('/api/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  })
+  // Merge updated profile into stored tokens
+  const tokens = loadAuthTokens()
+  if (tokens) {
+    tokens.user = { ...tokens.user, ...result.user }
+    saveAuthTokens(tokens)
+  }
+  return result
+}
+
+/**
+ * Change user password
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ success: boolean }> {
+  return authenticatedRequest('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
 }
 
 /**

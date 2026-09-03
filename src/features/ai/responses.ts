@@ -89,6 +89,7 @@ type Responses = {
   restoreUdhaarProposal: (description: string) => string
   restorePaymentProposal: (amount: number) => string
   restoreSaleProposal: (amount: number) => string
+  customerNotFound: (name: string) => string
 }
 
 const en: Responses = {
@@ -211,6 +212,7 @@ const en: Responses = {
   restoreUdhaarProposal: (description) => `Restore credit "${description}"?`,
   restorePaymentProposal: (amount) => `Restore payment of ${formatCurrency(amount)}?`,
   restoreSaleProposal: (amount) => `Restore sale of ${formatCurrency(amount)}?`,
+  customerNotFound: (name) => `"${name}" is not a customer in your Khata. Would you like to add them?`,
 }
 
 const ur: Responses = {
@@ -333,6 +335,7 @@ const ur: Responses = {
   restoreUdhaarProposal: (description) => `"${description}" ادھار بحال کر دوں؟`,
   restorePaymentProposal: (amount) => `${formatCurrency(amount)} کی ادائیگی بحال کر دوں؟`,
   restoreSaleProposal: (amount) => `${formatCurrency(amount)} کی فروخت بحال کر دوں؟`,
+  customerNotFound: (name) => `"${name}" نام کا کوئی گاہک آپ کے خاتے میں نہیں ہے۔ کیا آپ انہیں شامل کرنا چاہتے ہیں؟`,
 }
 
 const periodLabels: Record<AILanguage, Record<string, string>> = {

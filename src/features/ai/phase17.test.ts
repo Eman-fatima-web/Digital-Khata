@@ -3,7 +3,7 @@ import { detectIntent } from './intents'
 import { runEngine } from './engine'
 import type { KhataSnapshot } from './types'
 import type { Customer } from '../../core/types'
-import { generateId } from '../../lib/utils'
+import { generateId, localDateKey } from '../../lib/utils'
 
 function makeCustomer(overrides: Partial<Customer> = {}): Customer {
   return {
@@ -37,7 +37,7 @@ describe('Phase 17: RECEIVED_REPORT', () => {
   })
 
   it('generates daily received report with payments', () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateKey()
     const data = makeSnapshot({
       payments: [
         {

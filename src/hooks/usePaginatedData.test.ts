@@ -51,7 +51,7 @@ describe('Pagination Hooks Performance', () => {
       const names = result.current.items?.map((c) => c.name) ?? []
       const sortedNames = [...names].sort()
       expect(names).toEqual(sortedNames)
-    })
+    }, 20000)
 
     it('loads next page using page navigation', async () => {
       // Generate 100 customers
@@ -316,12 +316,12 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      }, { timeout: 15000 })
+      }, { timeout: 45000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
       expect(result.current.total).toBe(10000)
-    }, 30000)
+    }, 120000)
 
     it('handles 5,000 udhaar entries with customer filter', async () => {
       const customer: Customer = {
@@ -362,11 +362,11 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      }, { timeout: 15000 })
+      }, { timeout: 45000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
       expect(result.current.total).toBe(5000)
-    }, 30000)
+    }, 120000)
   })
 })

@@ -13,6 +13,11 @@ type LocalUser = {
   passwordHash: string
   businessId: string
   businessName: string
+  fullName?: string
+  phone?: string
+  address?: string
+  shopName?: string
+  cnic?: string
   emailVerified: boolean
   verificationToken?: string
   verificationTokenExpiry?: string
@@ -78,6 +83,13 @@ export async function verifyPassword(
   return bcrypt.compare(password, passwordHash)
 }
 
+export async function verifyLocalPassword(
+  password: string,
+  passwordHash: string
+): Promise<boolean> {
+  return bcrypt.compare(password, passwordHash)
+}
+
 export function findUserById(id: string): LocalUser | undefined {
   const store = loadStore()
   return store.users.find((u) => u.id === id)
@@ -131,4 +143,28 @@ export async function resetPasswordWithToken(
   delete user.passwordResetTokenExpiry
   saveStore(store)
   return true
+}
+
+export function setPasswordHash(userId: string, passwordHash: string): void {
+  const store = loadStore()
+  const user = store.users.find((u) => u.id === userId)
+  if (!user) throw new Error('User not found')
+  user.passwordHash = passwordHash
+  saveStore(store)
+}
+
+export function updateUserProfile(
+  userId: string,
+  fields: Partial<Pick<LocalUser, 'fullName' | 'phone' | 'address' | 'shopName' | 'cnic'>>,
+): LocalUser | undefined {
+  const store = loadStore()
+  const user = store.users.find((u) => u.id === userId)
+  if (!user) return undefined
+  if (fields.fullName !== undefined) user.fullName = fields.fullName
+  if (fields.phone !== undefined) user.phone = fields.phone
+  if (fields.address !== undefined) user.address = fields.address
+  if (fields.shopName !== undefined) user.shopName = fields.shopName
+  if (fields.cnic !== undefined) user.cnic = fields.cnic
+  saveStore(store)
+  return user
 }

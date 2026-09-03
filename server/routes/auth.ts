@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { createHash } from 'crypto'
 import { generateToken, authenticateToken, type AuthenticatedRequest } from '../middleware/auth.js'
 import { createChildLogger } from '../services/logger.js'
-import { query, isDatabaseAvailable } from '../database/index.js'
+import { query, getClient, isDatabaseAvailable } from '../database/index.js'
 import { generateCsrfToken } from '../middleware/csrf.js'
 import {
   findUserByEmail,
@@ -15,6 +15,8 @@ import {
   verifyEmailToken,
   setResetToken,
   resetPasswordWithToken,
+  setPasswordHash,
+  updateUserProfile,
 } from '../services/localAuth.js'
 import { sendMail } from '../config/mail.js'
 
@@ -94,6 +96,10 @@ authRouter.post('/login', async (req, res) => {
           id: user.id,
           businessId: user.business_id,
           email: user.email,
+          fullName: user.full_name,
+          phone: user.phone,
+          address: user.address,
+          shopName: user.shop_name,
           emailVerified: user.email_verified ?? false,
         },
       })
@@ -116,6 +122,10 @@ authRouter.post('/login', async (req, res) => {
           id: user.id,
           businessId: user.businessId,
           email: user.email,
+          fullName: user.fullName,
+          phone: user.phone,
+          address: user.address,
+          shopName: user.shopName,
           emailVerified: user.emailVerified ?? false,
         },
       })
@@ -131,64 +141,91 @@ authRouter.post('/login', async (req, res) => {
  */
 authRouter.post('/register', async (req, res) => {
   try {
-    const { email, password, businessName } = req.body
+    const { email, password, businessName, fullName, phone } = req.body
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' })
+    // Server-side validation (never trust the client)
+    if (typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+    if (typeof password !== 'string' || !password.trim()) {
+      return res.status(400).json({ error: 'Password is required' })
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
+
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Please provide a valid email address' })
     }
 
     const useDb = await isDatabaseAvailable()
 
     if (useDb) {
-      const passwordHash = await bcrypt.hash(password, 10)
+      const client = await getClient()
+      try {
+        await client.query('BEGIN')
 
-      const businessResult = await query(
-        `INSERT INTO businesses (name) VALUES ($1) RETURNING id`,
-        [businessName || 'My Business']
-      )
-      const businessId = businessResult.rows[0].id
+        // Fail fast on duplicate email BEFORE creating a business row to avoid
+        // leaking orphaned businesses on every duplicate-registration attempt.
+        const dup = await client.query(`SELECT id FROM users WHERE email = $1`, [normalizedEmail])
+        if (dup.rows.length > 0) {
+          await client.query('ROLLBACK')
+          return res.status(409).json({ error: 'An account with this email already exists' })
+        }
 
-      const userResult = await query(
-        `INSERT INTO users (email, password_hash, business_id)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (email) DO NOTHING
-         RETURNING id`,
-        [email, passwordHash, businessId]
-      )
+        const passwordHash = await bcrypt.hash(password, 10)
 
-      let userId: string
-      if (userResult.rows.length > 0) {
-        userId = userResult.rows[0].id
-      } else {
-        const existing = await query(`SELECT id, business_id FROM users WHERE email = $1`, [email])
-        userId = existing.rows[0].id
+        // Create the business (owner backfilled below after the user exists).
+        const businessResult = await client.query(
+          `INSERT INTO businesses (name) VALUES ($1) RETURNING id`,
+          [businessName?.trim() || 'My Business']
+        )
+        const businessId = businessResult.rows[0].id
+
+        const userResult = await client.query(
+          `INSERT INTO users (email, password_hash, business_id, full_name, phone)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id`,
+          [normalizedEmail, passwordHash, businessId, fullName?.trim() || null, phone?.trim() || null]
+        )
+        const userId = userResult.rows[0].id
+
+        // Backfill the business owner now that the user exists (resolves the
+        // circular user<->business reference).
+        await client.query(
+          `UPDATE businesses SET owner_id = $1, updated_at = NOW() WHERE id = $2`,
+          [userId, businessId]
+        )
+
+        await client.query('COMMIT')
+
+        const token = generateToken(userId, businessId)
+
+        return res.status(201).json({
+          token,
+          user: {
+            id: userId,
+            businessId,
+            email: normalizedEmail,
+            fullName: fullName?.trim() || null,
+            phone: phone?.trim() || null,
+            shopName: businessName?.trim() || null,
+            emailVerified: false,
+          },
+          message: 'User registered successfully',
+        })
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw error
+      } finally {
+        client.release()
       }
-
-      const existingRow = await query(
-        `SELECT u.id, u.business_id, u.email, u.email_verified
-         FROM users u
-         WHERE u.id = $1`,
-        [userId]
-      )
-      const row = existingRow.rows[0]
-
-      const token = generateToken(row.id, row.business_id)
-
-      res.status(201).json({
-        token,
-        user: {
-          id: row.id,
-          businessId: row.business_id,
-          email: row.email,
-          emailVerified: row.email_verified ?? false,
-        },
-        message: 'User registered successfully',
-      })
     } else {
-      let user = findUserByEmail(email)
-      if (!user) {
-        user = await createLocalUser(email, password, businessName || 'My Business')
+      if (findUserByEmail(normalizedEmail)) {
+        return res.status(409).json({ error: 'An account with this email already exists' })
       }
+      const user = await createLocalUser(normalizedEmail, password, businessName?.trim() || 'My Business')
       const token = generateToken(user.id, user.businessId)
 
       res.status(201).json({
@@ -197,6 +234,9 @@ authRouter.post('/register', async (req, res) => {
           id: user.id,
           businessId: user.businessId,
           email: user.email,
+          fullName: user.fullName ?? null,
+          phone: user.phone ?? null,
+          shopName: businessName?.trim() || null,
           emailVerified: false,
         },
         message: 'User registered successfully',
@@ -503,5 +543,136 @@ authRouter.post('/reset-password', async (req, res) => {
   } catch (error) {
     log.error({ err: error }, 'Reset password error')
     res.status(500).json({ error: 'Password reset failed' })
+  }
+})
+
+/**
+ * PUT /api/auth/profile
+ * Update the authenticated user's profile fields
+ */
+authRouter.put('/profile', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.userId!
+    const { fullName, phone, address, shopName, cnic } = req.body
+
+    const useDb = await isDatabaseAvailable()
+
+    if (useDb) {
+      const result = await query(
+        `UPDATE users SET
+          full_name = COALESCE($1, full_name),
+          phone = COALESCE($2, phone),
+          address = COALESCE($3, address),
+          shop_name = COALESCE($4, shop_name),
+          cnic = COALESCE($5, cnic),
+          updated_at = NOW()
+        WHERE id = $6
+        RETURNING id, email, full_name, phone, address, shop_name, cnic, email_verified`,
+        [fullName ?? null, phone ?? null, address ?? null, shopName ?? null, cnic ?? null, userId],
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      const row = result.rows[0]
+      res.json({
+        user: {
+          id: row.id,
+          email: row.email,
+          fullName: row.full_name,
+          phone: row.phone,
+          address: row.address,
+          shopName: row.shop_name,
+          cnic: row.cnic,
+          emailVerified: row.email_verified ?? false,
+        },
+      })
+    } else {
+      const updated = updateUserProfile(userId, { fullName, phone, address, shopName, cnic })
+      if (!updated) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      res.json({
+        user: {
+          id: updated.id,
+          email: updated.email,
+          fullName: updated.fullName,
+          phone: updated.phone,
+          address: updated.address,
+          shopName: updated.shopName,
+          cnic: updated.cnic,
+          emailVerified: updated.emailVerified ?? false,
+        },
+      })
+    }
+  } catch (error) {
+    log.error({ err: error }, 'Update profile error')
+    res.status(500).json({ error: 'Failed to update profile' })
+  }
+})
+
+/**
+ * POST /api/auth/change-password
+ * Change the authenticated user's password (requires current password)
+ */
+authRouter.post('/change-password', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.userId!
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' })
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' })
+    }
+
+    const useDb = await isDatabaseAvailable()
+
+    if (useDb) {
+      const result = await query(
+        `SELECT password_hash FROM users WHERE id = $1`,
+        [userId],
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      const user = result.rows[0]
+      const validPassword = await bcrypt.compare(currentPassword, user.password_hash)
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' })
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10)
+      await query(
+        `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+        [passwordHash, userId],
+      )
+
+      res.json({ success: true })
+    } else {
+      const user = findUserById(userId)
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      const validPassword = await verifyLocalPassword(currentPassword, user.passwordHash)
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' })
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10)
+      setPasswordHash(userId, passwordHash)
+
+      res.json({ success: true })
+    }
+  } catch (error) {
+    log.error({ err: error }, 'Change password error')
+    res.status(500).json({ error: 'Password change failed' })
   }
 })
