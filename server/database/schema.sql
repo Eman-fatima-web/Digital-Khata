@@ -8,7 +8,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE businesses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
-  owner_id UUID NOT NULL,
+  -- owner_id is set after user creation (registration runs in a transaction:
+  -- business -> user -> backfill owner_id). Nullable so the circular
+  -- user<->business reference can be resolved at registration time.
+  owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -19,9 +22,16 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  full_name VARCHAR(255),
+  phone VARCHAR(50),
+  address TEXT,
+  shop_name VARCHAR(255),
+  cnic VARCHAR(20),
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
   verification_token VARCHAR(255),
   verification_token_expiry TIMESTAMP WITH TIME ZONE,
+  password_reset_token VARCHAR(255),
+  password_reset_token_expiry TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

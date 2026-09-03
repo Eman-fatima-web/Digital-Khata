@@ -132,6 +132,41 @@ export async function sendOverdueReminders(
     }
 
     if (!success) {
+      log.info({ businessId, customerId: customer.customerId }, 'WhatsApp failed after retries, trying SMS fallback')
+      try {
+        const smsResult = await notificationService.send({
+          to: customer.customerPhone,
+          body: message,
+          channel: 'sms',
+          businessId,
+          customerId: customer.customerId,
+        })
+
+        if (smsResult.status === 'sent') {
+          success = true
+          results.sent++
+          results.details.push({ customerId: customer.customerId, name: customer.customerName, status: 'sent_sms_fallback' })
+
+          await query(
+            `INSERT INTO audit_logs (business_id, action, tool_name, status, details)
+             VALUES ($1, 'overdue_reminder_sent', 'reminder_service', 'success', $2)`,
+            [businessId, JSON.stringify({
+              customerId: customer.customerId,
+              customerName: customer.customerName,
+              amount: customer.totalOverdue,
+              messageId: smsResult.messageId,
+              provider: smsResult.provider,
+              channel: 'sms',
+              whatsappAttempts: attempts,
+            })],
+          )
+        }
+      } catch (smsError) {
+        log.error({ err: smsError, businessId, customerId: customer.customerId }, 'SMS fallback also failed')
+      }
+    }
+
+    if (!success) {
       results.failed++
       results.details.push({ customerId: customer.customerId, name: customer.customerName, status: 'failed' })
 

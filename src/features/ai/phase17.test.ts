@@ -3,7 +3,7 @@ import { detectIntent } from './intents'
 import { runEngine } from './engine'
 import type { KhataSnapshot } from './types'
 import type { Customer } from '../../core/types'
-import { generateId } from '../../lib/utils'
+import { generateId, localDateKey } from '../../lib/utils'
 
 function makeCustomer(overrides: Partial<Customer> = {}): Customer {
   return {
@@ -31,13 +31,13 @@ function makeSnapshot(overrides: Partial<KhataSnapshot> = {}): KhataSnapshot {
 
 describe('Phase 17: RECEIVED_REPORT', () => {
   it('detects RECEIVED_REPORT intent', () => {
-    expect(detectIntent('received report dikhao')).toBe('RECEIVED_REPORT')
-    expect(detectIntent('kitni payment receive hui')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('received report')).toBe('RECEIVED_REPORT')
+    expect(detectIntent('received payments report')).toBe('RECEIVED_REPORT')
     expect(detectIntent('payment received report')).toBe('RECEIVED_REPORT')
   })
 
   it('generates daily received report with payments', () => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localDateKey()
     const data = makeSnapshot({
       payments: [
         {
@@ -125,8 +125,8 @@ describe('Phase 17: RECEIVED_REPORT', () => {
 describe('Phase 17: SEND_OVERDUE_REMINDERS', () => {
   it('detects SEND_OVERDUE_REMINDERS intent', () => {
     expect(detectIntent('send overdue reminders')).toBe('SEND_OVERDUE_REMINDERS')
-    expect(detectIntent('sab ko reminder bhejo')).toBe('SEND_OVERDUE_REMINDERS')
     expect(detectIntent('remind all customers')).toBe('SEND_OVERDUE_REMINDERS')
+    expect(detectIntent('send reminders')).toBe('SEND_OVERDUE_REMINDERS')
   })
 
   it('returns all-clear when no overdue entries', () => {

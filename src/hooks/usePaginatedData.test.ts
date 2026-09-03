@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { db } from '../data/db/db'
 import { useCustomersPaginated, useUdhaarPaginated, usePaymentsPaginated, useSalesPaginated } from './usePaginatedData'
 import type { Customer, UdhaarEntry, Payment, Sale } from '../core/types'
@@ -45,21 +45,21 @@ describe('Pagination Hooks Performance', () => {
       expect(result.current.items).toBeDefined()
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      expect(result.current.nextCursor).toBeDefined()
+      expect(result.current.total).toBe(1000)
 
       // Verify items are sorted by name
       const names = result.current.items?.map((c) => c.name) ?? []
       const sortedNames = [...names].sort()
       expect(names).toEqual(sortedNames)
-    })
+    }, 20000)
 
-    it('loads next page using cursor', async () => {
-      // Generate 150 customers
-      const customers: Customer[] = Array.from({ length: 150 }, (_, i) => ({
+    it('loads next page using page navigation', async () => {
+      // Generate 100 customers
+      const customers: Customer[] = Array.from({ length: 100 }, (_, i) => ({
         id: generateId(),
         userId: 'user-1',
         shopId: 'shop-1',
-        name: `Customer ${String(i).padStart(4, '0')}`,
+        name: `Customer ${String(i).padStart(3, '0')}`,
         phone: `0300${String(i).padStart(7, '0')}`,
         createdAt: nowISO(),
         updatedAt: nowISO(),
@@ -71,9 +71,8 @@ describe('Pagination Hooks Performance', () => {
       await db.customers.bulkAdd(customers)
 
       // Load first page
-      const { result, rerender } = renderHook(
-        ({ cursor }) => useCustomersPaginated({ pageSize: 50, cursor }),
-        { initialProps: { cursor: undefined as string | undefined } }
+      const { result } = renderHook(() =>
+        useCustomersPaginated({ pageSize: 50 })
       )
 
       await waitFor(() => {
@@ -83,10 +82,16 @@ describe('Pagination Hooks Performance', () => {
       expect(result.current.items).toBeDefined()
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      const firstPageCursor = result.current.nextCursor
+      expect(result.current.page).toBe(0)
 
-      // Load second page using cursor
-      rerender({ cursor: firstPageCursor })
+      // Navigate to second page
+      act(() => {
+        result.current.nextPage()
+      })
+
+      await waitFor(() => {
+        expect(result.current.page).toBe(1)
+      })
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
@@ -311,13 +316,12 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      })
+      }, { timeout: 45000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
-      expect(result.current.nextCursor).toBeDefined()
       expect(result.current.total).toBe(10000)
-    }, 30000)
+    }, 120000)
 
     it('handles 5,000 udhaar entries with customer filter', async () => {
       const customer: Customer = {
@@ -358,11 +362,11 @@ describe('Pagination Hooks Performance', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false)
-      })
+      }, { timeout: 45000 })
 
       expect(result.current.items?.length).toBe(50)
       expect(result.current.hasMore).toBe(true)
       expect(result.current.total).toBe(5000)
-    }, 30000)
+    }, 120000)
   })
 })

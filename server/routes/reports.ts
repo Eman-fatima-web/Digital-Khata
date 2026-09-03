@@ -229,7 +229,8 @@ reportsRouter.get('/received', async (req: AuthenticatedRequest, res) => {
 
     const byMethod = new Map<string, number>()
     for (const p of payments) {
-      byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount)
+      const method = p.method as string
+      byMethod.set(method, (byMethod.get(method) ?? 0) + p.amount)
     }
 
     const byCustomer = new Map<string, { name: string; total: number; count: number }>()

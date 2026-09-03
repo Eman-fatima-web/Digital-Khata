@@ -56,10 +56,9 @@ type LegacySale = {
   createdAt?: string
 }
 
-const DEFAULT_USER_ID = 'user-default'
-const DEFAULT_SHOP_ID = 'shop-default'
+type Owner = { userId: string; shopId: string }
 
-function makeSyncable<T extends object>(record: T): T & {
+function makeSyncable<T extends object>(record: T, owner: Owner): T & {
   userId: string
   shopId: string
   syncStatus: 'pending'
@@ -69,8 +68,8 @@ function makeSyncable<T extends object>(record: T): T & {
 } {
   return {
     ...record,
-    userId: DEFAULT_USER_ID,
-    shopId: DEFAULT_SHOP_ID,
+    userId: owner.userId,
+    shopId: owner.shopId,
     syncStatus: 'pending' as const,
     version: 1,
     createdAt: nowISO(),
@@ -78,7 +77,15 @@ function makeSyncable<T extends object>(record: T): T & {
   }
 }
 
-export async function migrateLegacyData(): Promise<boolean> {
+export async function migrateLegacyData(owner?: Owner): Promise<boolean> {
+  // Tenant-safety: legacy localStorage data can only be safely attributed to a
+  // real authenticated account. If no owner is available (pre-auth startup),
+  // skip the migration entirely rather than stamp records with a fake tenant
+  // that no authenticated user could ever see.
+  if (!owner) {
+    return false
+  }
+
   if (localStorage.getItem(STORAGE_KEYS.MIGRATED) === 'true') {
     return false
   }
@@ -109,7 +116,7 @@ export async function migrateLegacyData(): Promise<boolean> {
           name: item.name,
           phone: item.phone ?? '',
           address: item.address,
-        } as Customer),
+        } as Customer, owner),
       )
     }
   }
@@ -136,7 +143,7 @@ export async function migrateLegacyData(): Promise<boolean> {
           remainingAmount:
             item.remainingAmount ?? Math.max(item.amount - (item.paidAmount ?? 0), 0),
           dueDate: item.dueDate,
-        } as UdhaarEntry),
+        } as UdhaarEntry, owner),
       )
     }
   }
@@ -158,7 +165,7 @@ export async function migrateLegacyData(): Promise<boolean> {
           amount: item.amount,
           method: (item.method as Payment['method']) ?? 'Cash',
           date: item.date ?? item.createdAt ?? nowISO(),
-        } as Payment),
+        } as Payment, owner),
       )
     }
   }
@@ -177,7 +184,7 @@ export async function migrateLegacyData(): Promise<boolean> {
           amount: item.amount,
           description: item.description ?? 'Migrated sale',
           date: item.date ?? item.createdAt ?? nowISO(),
-        } as Sale),
+        } as Sale, owner),
       )
     }
   }

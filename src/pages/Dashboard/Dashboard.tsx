@@ -50,6 +50,7 @@ function Dashboard() {
     const totalReceived = pays.reduce((sum, p) => sum + p.amount, 0)
     const totalSales = sals.reduce((sum, s) => sum + s.amount, 0)
     const transactionCount = entries.length + pays.length + sals.length
+    const customerCount = (customers ?? []).length
 
     return {
       totalReceivable,
@@ -57,8 +58,17 @@ function Dashboard() {
       totalReceived,
       totalSales,
       transactionCount,
+      customerCount,
     }
-  }, [udhaar, payments, sales])
+  }, [udhaar, payments, sales, customers])
+
+  const overdueCount = useMemo(
+    () =>
+      (udhaar ?? []).filter(
+        (e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < localDateKey(),
+      ).length,
+    [udhaar],
+  )
 
   const recentActivity = useMemo<ActivityItem[]>(() => {
     const customerMap = new Map((customers ?? []).map((c) => [c.id, c.name]))
@@ -97,14 +107,6 @@ function Dashboard() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 8)
   }, [udhaar, payments, sales, customers, t])
-
-  const overdueCount = useMemo(
-    () =>
-      (udhaar ?? []).filter(
-        (e) => e.remainingAmount > 0 && e.dueDate && e.dueDate < localDateKey(),
-      ).length,
-    [udhaar],
-  )
 
   const insightLines = useMemo(
     () =>
@@ -195,7 +197,7 @@ function Dashboard() {
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
                 placeholder={t('dashboard.aiHeroPlaceholder')}
-                className="min-w-0 flex-1 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                className="min-w-0 flex-1 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-400 focus:ring-2 focus:ring-primary-400"
               />
               <button
                 type="submit"
@@ -255,30 +257,42 @@ function Dashboard() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-4">
         <StatCard
+          label={t('dashboard.customers')}
+          value={stats.customerCount}
+          icon={Users}
+          iconClassName="bg-info/10 text-info"
+          prefix=""
+          onClick={() => navigate('/customers')}
+        />
+        <StatCard
           label={t('dashboard.totalUdhaar')}
           value={stats.totalReceivable}
           icon={Wallet}
           iconClassName="bg-success-50 text-success-500"
           trend={stats.totalReceivable > 0 ? `${udhaar.filter((e) => e.remainingAmount > 0).length} active` : undefined}
+          onClick={() => navigate('/udhaar')}
         />
         <StatCard
           label={t('dashboard.received')}
           value={stats.totalReceived}
           icon={ArrowDownLeft}
           iconClassName="bg-info/10 text-info"
+          onClick={() => navigate('/payments')}
         />
         <StatCard
           label={t('dashboard.totalSales')}
           value={stats.totalSales}
           icon={Activity}
           iconClassName="bg-warning/10 text-warning"
+          onClick={() => navigate('/sales')}
         />
         <StatCard
-          label={t('dashboard.transactions')}
-          value={stats.transactionCount}
-          icon={Receipt}
-          iconClassName="bg-primary-50 text-primary-500"
+          label={t('dashboard.overdue')}
+          value={overdueCount}
+          icon={Clock}
+          iconClassName="bg-danger/10 text-danger"
           prefix=""
+          onClick={() => navigate('/udhaar?filter=overdue')}
         />
       </section>
 

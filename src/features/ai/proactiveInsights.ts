@@ -35,7 +35,7 @@ export function setProactiveEnabled(enabled: boolean): void {
 /** Generate proactive insights from current data */
 export function generateProactiveInsights(
   data: KhataSnapshot,
-  language: 'en' | 'ur' | 'rom',
+  language: 'en' | 'ur',
 ): ProactiveInsight[] {
   if (!isProactiveEnabled()) return []
 

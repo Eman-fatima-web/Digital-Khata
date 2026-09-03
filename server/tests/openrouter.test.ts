@@ -177,7 +177,7 @@ describe('OpenRouterProvider', () => {
       businessData: { totalUdhaar: 50000 },
     })
 
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string)
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string)
     expect(body.messages).toHaveLength(3)
     expect(body.messages[2].role).toBe('system')
     expect(body.messages[2].content).toContain('totalUdhaar')
@@ -198,7 +198,7 @@ describe('OpenRouterProvider', () => {
       ],
     })
 
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string)
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string)
     expect(body.messages).toHaveLength(4)
     expect(body.messages[1].role).toBe('user')
     expect(body.messages[2].role).toBe('assistant')

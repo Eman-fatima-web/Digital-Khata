@@ -9,6 +9,8 @@ import { useApp } from '../hooks/useApp'
 const Login = lazy(() => import('../pages/Auth/Login'))
 const Register = lazy(() => import('../pages/Auth/Register'))
 const VerifyEmail = lazy(() => import('../pages/Auth/VerifyEmail'))
+const ForgotPassword = lazy(() => import('../pages/Auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'))
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('../pages/Customers/Customers'))
 const CustomerDetail = lazy(() => import('../pages/Customers/CustomerDetail'))
@@ -17,11 +19,13 @@ const Payments = lazy(() => import('../pages/Payments/Payments'))
 const Sales = lazy(() => import('../pages/Sales/Sales'))
 const AI = lazy(() => import('../pages/AI/AI'))
 const Reports = lazy(() => import('../pages/Reports/Reports'))
+const ReceivedReport = lazy(() => import('../pages/Reports/ReceivedReport'))
 const Reminders = lazy(() => import('../pages/Reminders/Reminders'))
 const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
 const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
 const Trash = lazy(() => import('../pages/Trash/Trash'))
 const Settings = lazy(() => import('../pages/Settings/Settings'))
+const AuditLog = lazy(() => import('../pages/AuditLog/AuditLog'))
 
 function App() {
   const { isLocked } = useApp()
@@ -32,6 +36,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route
           element={
@@ -48,11 +54,13 @@ function App() {
           <Route path="/sales" element={<Sales />} />
           <Route path="/ai" element={<AI />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/received" element={<ReceivedReport />} />
           <Route path="/reminders" element={<Reminders />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/conflicts" element={<Conflicts />} />
           <Route path="/trash" element={<Trash />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/audit-log" element={<AuditLog />} />
         </Route>
       </Routes>
     </BrowserRouter>

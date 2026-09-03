@@ -15,6 +15,32 @@ export async function recordPayment(
   try {
     await client.query('BEGIN')
 
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+      throw new Error('Amount must be a positive number')
+    }
+
+    // Tenant-safety: the payment's customer must belong to this business.
+    const customer = await client.query(
+      `SELECT 1 FROM customers WHERE id = $1 AND business_id = $2 AND is_deleted = FALSE`,
+      [customerId, businessId]
+    )
+    if (customer.rows.length === 0) {
+      throw new Error('Customer not found in this business')
+    }
+
+    // The linked udhaar (if any) must belong to this business AND to the same
+    // customer as the payment — prevents crediting another tenant's or another
+    // customer's udhaar.
+    if (udhaarId) {
+      const udhaar = await client.query(
+        `SELECT 1 FROM udhaar WHERE id = $1 AND business_id = $2 AND customer_id = $3 AND is_deleted = FALSE`,
+        [udhaarId, businessId, customerId]
+      )
+      if (udhaar.rows.length === 0) {
+        throw new Error('Udhaar not found for this customer in this business')
+      }
+    }
+
     // Insert payment
     const paymentResult = await client.query(
       `INSERT INTO payments (business_id, customer_id, udhaar_id, amount, method, date, sync_status, version)

@@ -19,12 +19,11 @@ export type SyncStatus = (typeof SYNC_STATUS)[keyof typeof SYNC_STATUS]
 export const LANGUAGES = [
   { code: 'en', label: 'English', labelUrdu: 'انگریزی', dir: 'ltr' },
   { code: 'ur', label: 'Urdu', labelUrdu: 'اردو', dir: 'rtl' },
-  { code: 'rom', label: 'Roman Urdu', labelUrdu: 'رومن اردو', dir: 'ltr' },
 ] as const
 
 export type LanguageCode = (typeof LANGUAGES)[number]['code']
 
-export const THEMES = ['light', 'dark'] as const
+export const THEMES = ['light', 'dark', 'system'] as const
 export type Theme = (typeof THEMES)[number]
 
 export const APP_NAME = 'Digital Khata'

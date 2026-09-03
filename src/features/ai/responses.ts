@@ -89,128 +89,130 @@ type Responses = {
   restoreUdhaarProposal: (description: string) => string
   restorePaymentProposal: (amount: number) => string
   restoreSaleProposal: (amount: number) => string
+  customerNotFound: (name: string) => string
 }
 
 const en: Responses = {
   balance: (name, outstanding, total, paid, entries, activeCount) => {
-    if (outstanding === 0) return `${name} ka koi udhaar nahi hai. Sab clear hai! ✨`
+    if (outstanding === 0) return `${name} has no outstanding balance. All clear!`
     const lines = entries
       .slice(0, 3)
       .map(
         (e) =>
-          `• ${e.description} — ${formatCurrency(e.remaining)} baqi${e.due ? ` (${formatDate(e.due)} tak)` : ''}`,
+          `• ${e.description} — ${formatCurrency(e.remaining)} remaining${e.due ? ` (due ${formatDate(e.due)})` : ''}`,
       )
       .join('\n')
-    return `${name} ka ${formatCurrency(outstanding)} udhaar baqi hai.\nTotal: ${formatCurrency(total)} | Ada hua: ${formatCurrency(paid)} | ${activeCount} entries${lines ? `\n${lines}` : ''}`
+    return `${name} has ${formatCurrency(outstanding)} outstanding.\nTotal: ${formatCurrency(total)} | Paid: ${formatCurrency(paid)} | ${activeCount} entries${lines ? `\n${lines}` : ''}`
   },
   topDebtors: (list) => {
-    if (list.length === 0) return 'Kisi ka bhi udhaar baqi nahi hai. Sab clear!'
+    if (list.length === 0) return 'No outstanding balances. All clear!'
     const lines = list
       .map((item, i) => `${i + 1}. ${item.name} — ${formatCurrency(item.amount)}`)
       .join('\n')
-    return `Sab se zyada udhaar inka hai:\n${lines}`
+    return `Top outstanding balances:\n${lines}`
   },
   sales: (periodLabel, amount, count) =>
-    `${periodLabel} ki sales: ${formatCurrency(amount)} (${count} sale${count === 1 ? '' : 's'}).`,
+    `${periodLabel} sales: ${formatCurrency(amount)} (${count} sale${count === 1 ? '' : 's'}).`,
   salesForCustomer: (name, amount, count) =>
-    `${name} ki sales: ${formatCurrency(amount)} (${count} sale${count === 1 ? '' : 's'}).`,
+    `${name}'s sales: ${formatCurrency(amount)} (${count} sale${count === 1 ? '' : 's'}).`,
   overdue: (list) => {
-    if (list.length === 0) return 'Koi bhi payment overdue nahi hai. Sab on time!'
+    if (list.length === 0) return 'No overdue payments. Everything is on time!'
     const lines = list
-      .map((item) => `• ${item.name} — ${formatCurrency(item.amount)} (${item.days} din late)`)
+      .map((item) => `• ${item.name} — ${formatCurrency(item.amount)} (${item.days} days late)`)
       .join('\n')
-    return `Ye payments overdue hain:\n${lines}`
+    return `These payments are overdue:\n${lines}`
   },
   customerPayments: (name, total, count, latest) => {
-    if (count === 0) return `${name} ne abhi tak koi payment nahi ki.`
+    if (count === 0) return `${name} has not made any payments yet.`
     const latestLine = latest
       ? ` Last: ${formatCurrency(latest.amount)} via ${latest.method} on ${formatDate(latest.date)}.`
       : ''
-    return `${name} ne total ${formatCurrency(total)} ada kiye hain (${count} payment${count === 1 ? '' : 's'}).${latestLine}`
+    return `${name} has paid ${formatCurrency(total)} in total (${count} payment${count === 1 ? '' : 's'}).${latestLine}`
   },
   paymentsReceived: (periodLabel, total, count) =>
-    `${periodLabel} mein ${formatCurrency(total)} receive hue (${count} payment${count === 1 ? '' : 's'}).`,
+    `${formatCurrency(total)} received ${periodLabel} (${count} payment${count === 1 ? '' : 's'}).`,
   history: (name, lines) => {
-    if (lines.length === 0) return `${name} ki koi transactions nahi hain abhi tak.`
+    if (lines.length === 0) return `${name} has no transactions yet.`
     const rendered = lines
       .map((line) => `• ${formatDate(line.date)} — ${line.text}`)
       .join('\n')
-    return `${name} ki recent activity:\n${rendered}`
+    return `${name}'s recent activity:\n${rendered}`
   },
   udhaarLine: (description, amount, remaining) =>
-    `Udhaar: ${description}, ${formatCurrency(amount)} (baqi ${formatCurrency(remaining)})`,
+    `Credit: ${description}, ${formatCurrency(amount)} (${formatCurrency(remaining)} remaining)`,
   paymentLine: (amount, method) => `Payment: ${formatCurrency(amount)} via ${method}`,
   saleLine: (description, amount) => `Sale: ${description}, ${formatCurrency(amount)}`,
   totals: (outstanding, udhaarGiven, received, customersCount, salesThisMonth) =>
-    `Khata ka summary:\n• Baqi: ${formatCurrency(outstanding)} (${customersCount} customers)\n• Total udhaar: ${formatCurrency(udhaarGiven)}\n• Total received: ${formatCurrency(received)}\n• Is month ki sales: ${formatCurrency(salesThisMonth)}`,
+    `Khata summary:\n• Outstanding: ${formatCurrency(outstanding)} (${customersCount} customers)\n• Total credit given: ${formatCurrency(udhaarGiven)}\n• Total received: ${formatCurrency(received)}\n• This month's sales: ${formatCurrency(salesThisMonth)}`,
   clarifyCustomers: (candidates) =>
-    `Mujhe ${candidates.length} customers mile hain: ${candidates.join(', ')}. Aap kis ki baat kar rahe hain? Full name batayein.`,
+    `I found ${candidates.length} customers: ${candidates.join(', ')}. Which one are you referring to? Please provide the full name.`,
   noCustomer: (names) =>
-    `Sorry, main ye customer identify nahi kar saka. Aapke customers: ${names.join(', ')}.`,
-  noPaymentsToDelete: (name) => `${name} ki koi payment nahi hai delete karne ke liye.`,
-  noUdhaarEntries: (name) => `${name} ka koi udhaar nahi hai delete karne ke liye.`,
+    `Sorry, I couldn't identify that customer. Your customers: ${names.join(', ')}.`,
+  noPaymentsToDelete: (name) => `${name} has no payments to delete.`,
+  noUdhaarEntries: (name) => `${name} has no credit entries to delete.`,
   deleteUdhaarClarify: (name, entries) =>
-    `${name} ke ${entries.length} udhaar entries hain:\n${entries.map((e, i) => `${i + 1}. ${e}`).join('\n')}\nUdhaar page se delete karein, ya entry ki details batayein.`,
-  noOutstanding: (name) => `${name} ka koi udhaar baqi nahi hai.`,
+    `${name} has ${entries.length} credit entries:\n${entries.map((e, i) => `${i + 1}. ${e}`).join('\n')}\nPlease delete from the Udhaar page, or provide more details about the entry.`,
+  noOutstanding: (name) => `${name} has no outstanding balance.`,
   askAmount: () =>
-    'Kitna? Amount batayein, jaise "Ahmed ki 2000 payment receive kar lo".',
-  askCustomer: () => 'Kaunsa customer? Customer ka name batayein.',
-  proposalLead: () => 'Maine ye action prepare kiya hai — confirm karne se pehle review karlein:',
+    'How much? Please specify the amount, e.g. "Receive 2000 payment from Ahmed".',
+  askCustomer: () => 'Which customer? Please provide the customer name.',
+  proposalLead: () => 'I have prepared this action — please review before confirming:',
   successPayment: (name, amount, outstanding) =>
-    `Ho gaya! ${name} ki ${formatCurrency(amount)} payment record ho gayi. Ab baqi: ${formatCurrency(outstanding)}.`,
+    `Done! ${name}'s payment of ${formatCurrency(amount)} has been recorded. Remaining: ${formatCurrency(outstanding)}.`,
   successUdhaar: (name, amount, outstanding) =>
-    `Ho gaya! ${name} ka ${formatCurrency(amount)} udhaar record ho gaya. Ab baqi: ${formatCurrency(outstanding)}.`,
-  successDeleteUdhaar: (description) => `Ho gaya! Udhaar "${description}" delete ho gaya.`,
+    `Done! Credit of ${formatCurrency(amount)} recorded for ${name}. Remaining: ${formatCurrency(outstanding)}.`,
+  successDeleteUdhaar: (description) => `Done! Credit "${description}" has been deleted.`,
   successDeletePayment: (amount, date) =>
-    `Ho gaya! ${formatCurrency(amount)} ki payment delete ho gayi (${formatDate(date)}).`,
-  successReminder: (name) => `${name} ki reminder aapke messaging app mein khul gayi hai.`,
+    `Done! Payment of ${formatCurrency(amount)} has been deleted (${formatDate(date)}).`,
+  successReminder: (name) => `${name}'s reminder has been opened in your messaging app.`,
   reminderFailed: () =>
-    'Messaging app nahi khul saki. Reminders page se reminder bhej sakte hain.',
-  shareCancelled: () => 'Reminder cancel ho gayi.',
-  actionFailed: () => 'Sorry, ye action karte waqt kuch problem aa gayi. Dobara try karein.',
+    'Could not open messaging app. You can send reminders from the Reminders page.',
+  shareCancelled: () => 'Reminder cancelled.',
+  actionFailed: () => 'Sorry, something went wrong. Please try again.',
   fallback: (online, cloudAvailable) => {
     if (!online) {
-      return 'Advanced AI offline mein unavailable hai, lekin main aapke saved Khata data se questions ka jawab de sakta hoon.\nTry:\n• "Ahmed ka balance?"\n• "Is month meri sales kitni hain?"\n• "Overdue customers"'
+      return 'Advanced AI is unavailable offline, but I can still answer questions from your saved Khata data.\nTry:\n• "Ahmed balance"\n• "This month sales"\n• "Overdue customers"'
     }
     if (!cloudAvailable) {
-      return 'Main ye samajh nahi saka. Cloud AI abhi connected nahi hai, lekin main aapke customers, udhaar, payments aur sales ke baare mein questions ka jawab de sakta hoon.\nTry:\n• "Ahmed ka balance?"\n• "Sabse zyada udhaar kis ka hai?"\n• "Ahmed ki 2000 payment receive kar lo"'
+      return 'I couldn\'t understand that. Cloud AI is not connected, but I can answer questions about your customers, credit, payments, and sales.\nTry:\n• "Ahmed balance"\n• "Top debtors"\n• "Receive 2000 payment from Ahmed"'
     }
-    return 'Cloud AI se try karta hoon...'
+    return 'Trying Cloud AI...'
   },
-  greeting: () => 'Wa alaikum assalam! Main aapki kya madad kar sakta hoon?',
-  help: () => 'Main in cheezon mein madad kar sakta hoon:\n• Customer balance — "Ahmed ka balance batao"\n• Payment record — "Ahmed ki 2000 payment receive kar lo"\n• Udhaar add — "Ahmed ko 5000 udhaar do"\n• Sales record — "Aaj ki sale likho"\n• Customer create — "Naya customer add karo"\n• Overdue check — "Kis ka udhaar overdue hai?"\n• Business insights — "Karobar kaisa chal raha hai?"\n\nEnglish, Urdu, ya Roman Urdu mein naturally type ya speak karein!',
-  pronounUnclear: () => 'Mujhe yakeen nahi ke aap kis ki baat kar rahe hain. Customer ka name batayein.',
-  newCustomerProposal: (name) => `Main "${name}" naam ka naya customer bana doon?`,
-  saleProposal: (name, amount) => `${name ? `${name} ke liye` : ''} ${formatCurrency(amount)} ki sale record kar doon?`,
-  successCreateCustomer: (name) => `Ho gaya! Customer "${name}" ban gaya hai.`,
-  successSale: (name, amount) => `Ho gaya! ${formatCurrency(amount)} ki sale record ho gayi${name ? ` ${name} ke liye` : ''}.`,
+  greeting: () => 'Hello! How can I help you today?',
+  help: () => 'I can help with:\n• Customer balance — "Ahmed balance"\n• Record payment — "Receive 2000 payment from Ahmed"\n• Add credit — "Add 5000 credit for Ahmed"\n• Record sale — "Record sale 3000"\n• Create customer — "Add new customer Ahmed"\n• Check overdue — "Overdue customers"\n• Business insights — "Business overview"\n\nType or speak naturally in English or Urdu!',
+  pronounUnclear: () => 'I\'m not sure who you are referring to. Please provide the customer name.',
+  newCustomerProposal: (name) => `Create new customer "${name}"?`,
+  saleProposal: (name, amount) => `Record a sale of ${formatCurrency(amount)}${name ? ` for ${name}` : ''}?`,
+  successCreateCustomer: (name) => `Done! Customer "${name}" has been created.`,
+  successSale: (name, amount) => `Done! Sale of ${formatCurrency(amount)} recorded${name ? ` for ${name}` : ''}.`,
   successDeleteSale: (amount, date) =>
-    `Ho gaya! ${formatCurrency(amount)} ki sale delete ho gayi (${formatDate(date)}).`,
-  successUpdateCustomer: (name) => `Ho gaya! Customer "${name}" update ho gaya.`,
-  successUpdateUdhaar: (description) => `Ho gaya! Udhaar "${description}" update ho gaya.`,
+    `Done! Sale of ${formatCurrency(amount)} has been deleted (${formatDate(date)}).`,
+  successUpdateCustomer: (name) => `Done! Customer "${name}" has been updated.`,
+  successUpdateUdhaar: (description) => `Done! Credit "${description}" has been updated.`,
   successUpdatePayment: (amount, date) =>
-    `Ho gaya! ${formatCurrency(amount)} ki payment update ho gayi (${formatDate(date)}).`,
-  noSalesToDelete: (name) => `${name} ki koi sale nahi hai delete karne ke liye.`,
-  noUdhaarToUpdate: (name) => `${name} ka koi udhaar nahi hai update karne ke liye.`,
-  noPaymentToUpdate: (name) => `${name} ki koi payment nahi hai update karne ke liye.`,
-  deleteSaleProposal: (name, amount) => `${name ? `${name} ki` : ''} ${formatCurrency(amount)} ki sale delete kar doon?`,
-  updateCustomerProposal: (name) => `"${name}" ki details update kar doon?`,
-  updateUdhaarProposal: (description, amount) => `"${description}" (${formatCurrency(amount)}) udhaar update kar doon?`,
-  updatePaymentProposal: (amount, date) => `${formatDate(date)} ki ${formatCurrency(amount)} payment update kar doon?`,
-  successRestoreCustomer: (name) => `Ho gaya! Customer "${name}" restore ho gaya hai.`,
-  successRestoreUdhaar: (description) => `Ho gaya! Udhaar "${description}" restore ho gaya.`,
+    `Done! Payment of ${formatCurrency(amount)} has been updated (${formatDate(date)}).`,
+  noSalesToDelete: (name) => `${name} has no sales to delete.`,
+  noUdhaarToUpdate: (name) => `${name} has no credit entries to update.`,
+  noPaymentToUpdate: (name) => `${name} has no payments to update.`,
+  deleteSaleProposal: (name, amount) => `Delete sale of ${formatCurrency(amount)}${name ? ` for ${name}` : ''}?`,
+  updateCustomerProposal: (name) => `Update details for "${name}"?`,
+  updateUdhaarProposal: (description, amount) => `Update credit "${description}" (${formatCurrency(amount)})?`,
+  updatePaymentProposal: (amount, date) => `Update payment of ${formatCurrency(amount)} on ${formatDate(date)}?`,
+  successRestoreCustomer: (name) => `Done! Customer "${name}" has been restored.`,
+  successRestoreUdhaar: (description) => `Done! Credit "${description}" has been restored.`,
   successRestorePayment: (amount, date) =>
-    `Ho gaya! ${formatCurrency(amount)} ki payment restore ho gayi (${formatDate(date)}).`,
+    `Done! Payment of ${formatCurrency(amount)} has been restored (${formatDate(date)}).`,
   successRestoreSale: (amount, date) =>
-    `Ho gaya! ${formatCurrency(amount)} ki sale restore ho gayi (${formatDate(date)}).`,
-  noDeletedCustomer: (name) => `"${name}" koi deleted customer nahi mila.`,
-  noDeletedUdhaar: (name) => `${name} ka koi deleted udhaar nahi hai.`,
-  noDeletedPayment: (name) => `${name} ki koi deleted payment nahi hai.`,
-  noDeletedSale: (name) => `${name} ki koi deleted sale nahi hai.`,
-  restoreCustomerProposal: (name) => `"${name}" ko restore kar doon?`,
-  restoreUdhaarProposal: (description) => `"${description}" udhaar restore kar doon?`,
-  restorePaymentProposal: (amount) => `${formatCurrency(amount)} ki payment restore kar doon?`,
-  restoreSaleProposal: (amount) => `${formatCurrency(amount)} ki sale restore kar doon?`,
+    `Done! Sale of ${formatCurrency(amount)} has been restored (${formatDate(date)}).`,
+  noDeletedCustomer: (name) => `No deleted customer found for "${name}".`,
+  noDeletedUdhaar: (name) => `${name} has no deleted credit entries.`,
+  noDeletedPayment: (name) => `${name} has no deleted payments.`,
+  noDeletedSale: (name) => `${name} has no deleted sales.`,
+  restoreCustomerProposal: (name) => `Restore customer "${name}"?`,
+  restoreUdhaarProposal: (description) => `Restore credit "${description}"?`,
+  restorePaymentProposal: (amount) => `Restore payment of ${formatCurrency(amount)}?`,
+  restoreSaleProposal: (amount) => `Restore sale of ${formatCurrency(amount)}?`,
+  customerNotFound: (name) => `"${name}" is not a customer in your Khata. Would you like to add them?`,
 }
 
 const ur: Responses = {
@@ -300,7 +302,7 @@ const ur: Responses = {
     return 'کلاؤڈ AI سے پوچھتا ہوں...'
   },
   greeting: () => 'وعلیکم السلام! میں آپ کے خاتے میں آج آپ کی کیا مدد کر سکتا ہوں؟',
-  help: () => 'میں ان چیزوں میں مدد کر سکتا ہوں:\n• گاہک کا بیلنس دیکھیں — "احمد کا بیلنس بتاؤ"\n• ادائیگی ریکارڈ کریں — "احمد کی 2000 ادائیگی وصول کر لو"\n• ادھار شامل کریں — "احمد کو 5000 ادھار دو"\n• فروخت ریکارڈ کریں — "آج کی فروخت لکھو"\n• نیا گاہک بنائیں — "نیا گاہک شامل کرو"\n• تاخیر شدہ دیکھیں — "کس کا ادھار تاخیر شدہ ہے؟"\n• کاروباری جائزہ — "کاروبار کیسا چل رہا ہے؟"\n\nبس انگریزی، اردو یا رومن اردو میں قدرتی طور پر ٹائپ یا بولیں!',
+  help: () => 'میں ان چیزوں میں مدد کر سکتا ہوں:\n• گاہک کا بیلنس دیکھیں — "احمد کا بیلنس بتاؤ"\n• ادائیگی ریکارڈ کریں — "احمد کی 2000 ادائیگی وصول کر لو"\n• ادھار شامل کریں — "احمد کو 5000 ادھار دو"\n• فروخت ریکارڈ کریں — "آج کی فروخت لکھو"\n• نیا گاہک بنائیں — "نیا گاہک شامل کرو"\n• تاخیر شدہ دیکھیں — "کس کا ادھار تاخیر شدہ ہے؟"\n• کاروباری جائزہ — "کاروبار کیسا چل رہا ہے؟"\n\nبس انگریزی یا اردو میں قدرتی طور پر ٹائپ یا بولیں!',
   pronounUnclear: () => 'مجھے یقین نہیں کہ آپ کس کا حوالہ دے رہے ہیں۔ براہ کرم گاہک کا نام بتائیں۔',
   newCustomerProposal: (name) => `میں "${name}" نام کا نیا گاہک بناؤں گا۔ کیا میں آگے بڑھوں؟`,
   saleProposal: (name, amount) => `${name ? `${name} کے لیے` : ''} ${formatCurrency(amount)} کی فروخت ریکارڈ کروں؟`,
@@ -333,6 +335,7 @@ const ur: Responses = {
   restoreUdhaarProposal: (description) => `"${description}" ادھار بحال کر دوں؟`,
   restorePaymentProposal: (amount) => `${formatCurrency(amount)} کی ادائیگی بحال کر دوں؟`,
   restoreSaleProposal: (amount) => `${formatCurrency(amount)} کی فروخت بحال کر دوں؟`,
+  customerNotFound: (name) => `"${name}" نام کا کوئی گاہک آپ کے خاتے میں نہیں ہے۔ کیا آپ انہیں شامل کرنا چاہتے ہیں؟`,
 }
 
 const periodLabels: Record<AILanguage, Record<string, string>> = {
@@ -345,11 +348,6 @@ const periodLabels: Record<AILanguage, Record<string, string>> = {
     today: 'آج کی', week: 'اس ہفتے کی', month: 'اس مہینے کی',
     yesterday: 'کل کی', last_week: 'پچھلے ہفتے کی', last_month: 'پچھلے مہینے کی',
     last_7_days: 'پچھلے 7 دن', last_30_days: 'پچھلے 30 دن',
-  },
-  rom: {
-    today: 'aaj', week: 'is haftay', month: 'is mahinay',
-    yesterday: 'kal', last_week: 'pichlay haftay', last_month: 'pichlay mahinay',
-    last_7_days: 'pichlay 7 din', last_30_days: 'pichlay 30 din',
   },
 }
 

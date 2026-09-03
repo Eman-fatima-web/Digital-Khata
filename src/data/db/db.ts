@@ -108,6 +108,21 @@ export class KhataDB extends Dexie {
           return Promise.all(promises)
         })
       })
+
+    // Version 7: Compound [userId+shopId] index on the four tenant-scoped
+    // entity stores so the data-isolation queries in useKhataData
+    // (db.X.where('[userId+shopId]')) can run. Indexing is additive and the
+    // existing stores/indexes are preserved unchanged.
+    this.version(7).stores({
+      customers:
+        'id, name, phone, userId, shopId, syncStatus, createdAt, updatedAt, isDeleted, [userId+shopId], [name+isDeleted], [phone+isDeleted], [createdAt+isDeleted]',
+      udhaar:
+        'id, customerId, userId, shopId, syncStatus, dueDate, remainingAmount, createdAt, updatedAt, isDeleted, [userId+shopId], [customerId+isDeleted], [dueDate+isDeleted], [createdAt+isDeleted]',
+      payments:
+        'id, customerId, udhaarId, userId, shopId, syncStatus, date, createdAt, updatedAt, isDeleted, [userId+shopId], [customerId+isDeleted], [date+isDeleted]',
+      sales:
+        'id, customerId, userId, shopId, syncStatus, date, createdAt, updatedAt, isDeleted, [userId+shopId], [customerId+isDeleted], [date+isDeleted]',
+    })
   }
 }
 

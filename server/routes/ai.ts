@@ -5,6 +5,7 @@ import { getAIProvider } from '../providers/index.js'
 import { validateToolCall, requiresConfirmation } from '../validation/toolCalls.js'
 import { generateConfirmationToken, validateConfirmationToken } from '../middleware/confirmation.js'
 import { logAuditEvent } from '../middleware/audit.js'
+import { minimizeContext } from '../lib/pii.js'
 import { createChildLogger } from '../services/logger.js'
 import * as customerRepo from '../repositories/customerRepository.js'
 import * as udhaarRepo from '../repositories/udhaarRepository.js'
@@ -67,7 +68,7 @@ aiRouter.post('/chat', async (req: AuthenticatedRequest, res) => {
       if (requiresConfirmation(tc.name)) {
         return {
           ...tc,
-          confirmationToken: generateConfirmationToken(tc.name, tc.arguments as Record<string, unknown>),
+          confirmationToken: generateConfirmationToken(tc.name, tc.arguments as Record<string, unknown>, userId, businessId),
         }
       }
       return tc
@@ -167,7 +168,7 @@ aiRouter.post('/tool/execute', async (req: AuthenticatedRequest, res) => {
         })
       }
       
-      const validation = validateConfirmationToken(confirmationToken, toolName, validatedArgs)
+      const validation = validateConfirmationToken(confirmationToken, toolName, validatedArgs, userId, businessId)
       if (!validation.valid) {
         await logAuditEvent({
           businessId,
@@ -245,26 +246,6 @@ Always be helpful, accurate, and secure.`
 /**
  * Minimize context data to send only what's necessary
  */
-function minimizeContext(businessData: Record<string, unknown>): Record<string, unknown> {
-  // Remove sensitive fields and limit data size
-  const minimized = { ...businessData }
-  
-  // Remove any fields that shouldn't be sent to AI
-  delete minimized.apiKey
-  delete minimized.password
-  delete minimized.token
-  
-  // Limit array sizes
-  if (Array.isArray(minimized.customers)) {
-    minimized.customers = (minimized.customers as unknown[]).slice(0, 50)
-  }
-  if (Array.isArray(minimized.transactions)) {
-    minimized.transactions = (minimized.transactions as unknown[]).slice(0, 100)
-  }
-
-  return minimized
-}
-
 function extractRecordId(toolName: string, result: Record<string, unknown>): string | undefined {
   switch (toolName) {
     case 'create_customer': return result.customerId as string

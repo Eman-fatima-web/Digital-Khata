@@ -21,8 +21,8 @@ describe('OllamaProvider', () => {
 
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    process.env.AI_SERVICE_URL = 'http://localhost:8000'
-    process.env.OLLAMA_MODEL = 'gemma3'
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+    process.env.OLLAMA_MODEL = 'qwen3:4b'
   })
 
   afterEach(() => {
@@ -46,11 +46,12 @@ describe('OllamaProvider', () => {
     expect(provider.name).toBe('ollama')
   })
 
-  it('sends correct request format to FastAPI service', async () => {
+  it('sends correct request format to Ollama native API', async () => {
     const provider = await createProvider()
     mockFetchResponse({
-      response: 'Hello from Ollama!',
-      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      message: { content: 'Hello from Ollama!' },
+      prompt_eval_count: 10,
+      eval_count: 5,
     })
 
     await provider.answer({
@@ -62,12 +63,13 @@ describe('OllamaProvider', () => {
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1)
     const [url, options] = vi.mocked(globalThis.fetch).mock.calls[0]
-    expect(url).toBe('http://localhost:8000/api/chat')
+    expect(url).toBe('http://localhost:11434/api/chat')
 
     const body = JSON.parse((options as RequestInit).body as string)
-    expect(body.model).toBe('gemma3')
-    expect(body.max_tokens).toBe(500)
-    expect(body.temperature).toBe(0.5)
+    expect(body.model).toBe('qwen3:4b')
+    expect(body.stream).toBe(false)
+    expect(body.options.num_predict).toBe(500)
+    expect(body.options.temperature).toBe(0.5)
     expect(body.messages).toHaveLength(2)
     expect(body.messages[0].role).toBe('system')
     expect(body.messages[0].content).toBe('You are helpful')
@@ -78,8 +80,9 @@ describe('OllamaProvider', () => {
   it('returns text and usage from successful response', async () => {
     const provider = await createProvider()
     mockFetchResponse({
-      response: 'The answer is 42',
-      usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      message: { content: 'The answer is 42' },
+      prompt_eval_count: 20,
+      eval_count: 10,
     })
 
     const result = await provider.answer({
@@ -95,10 +98,10 @@ describe('OllamaProvider', () => {
     })
   })
 
-  it('returns result without usage when not provided', async () => {
+  it('returns result without usage when eval counts are zero', async () => {
     const provider = await createProvider()
     mockFetchResponse({
-      response: 'Some text',
+      message: { content: 'Some text' },
     })
 
     const result = await provider.answer({
@@ -112,7 +115,7 @@ describe('OllamaProvider', () => {
 
   it('includes conversation history in messages', async () => {
     const provider = await createProvider()
-    mockFetchResponse({ response: 'Follow up answer' })
+    mockFetchResponse({ message: { content: 'Follow up answer' } })
 
     await provider.answer({
       prompt: 'And what about payments?',
@@ -123,7 +126,7 @@ describe('OllamaProvider', () => {
       ],
     })
 
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string)
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string)
     expect(body.messages).toHaveLength(4)
     expect(body.messages[0].role).toBe('system')
     expect(body.messages[1].role).toBe('user')
@@ -134,20 +137,21 @@ describe('OllamaProvider', () => {
     expect(body.messages[3].content).toBe('And what about payments?')
   })
 
-  it('includes business data as system message when provided', async () => {
+  it('includes summarized business data as system message when provided', async () => {
     const provider = await createProvider()
-    mockFetchResponse({ response: 'Got it' })
+    mockFetchResponse({ message: { content: 'Got it' } })
 
     await provider.answer({
       prompt: 'test',
       systemInstructions: 'test',
-      businessData: { totalUdhaar: 50000 },
+      businessData: { udhaar: [{ remainingAmount: 50000 }] },
     })
 
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string)
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string)
     expect(body.messages).toHaveLength(3)
     expect(body.messages[2].role).toBe('system')
-    expect(body.messages[2].content).toContain('totalUdhaar')
+    expect(body.messages[2].content).toContain('Business context')
+    expect(body.messages[2].content).toContain('totalOutstanding')
     expect(body.messages[2].content).toContain('50000')
   })
 
@@ -162,7 +166,7 @@ describe('OllamaProvider', () => {
 
   it('throws on HTTP error response', async () => {
     const provider = await createProvider()
-    mockFetchResponse({ detail: 'Internal error' }, 500, false)
+    mockFetchResponse({ error: 'Internal error' }, 500, false)
 
     await expect(
       provider.answer({ prompt: 'test', systemInstructions: 'test' }),
@@ -185,47 +189,47 @@ describe('OllamaProvider', () => {
 
   it('throws on empty response', async () => {
     const provider = await createProvider()
-    mockFetchResponse({ response: '' })
+    mockFetchResponse({ message: { content: '' } })
 
     await expect(
       provider.answer({ prompt: 'test', systemInstructions: 'test' }),
     ).rejects.toThrow('Ollama service returned empty response')
   })
 
-  it('uses custom AI_SERVICE_URL from environment', async () => {
-    process.env.AI_SERVICE_URL = 'http://custom-host:9000'
+  it('uses custom OLLAMA_BASE_URL from environment', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://custom-host:11434'
     const { OllamaProvider } = await import('../providers/OllamaProvider.js')
     const provider = new OllamaProvider()
-    mockFetchResponse({ response: 'ok' })
+    mockFetchResponse({ message: { content: 'ok' } })
 
     await provider.answer({ prompt: 'test', systemInstructions: 'test' })
 
     const [url] = vi.mocked(globalThis.fetch).mock.calls[0]
-    expect(url).toBe('http://custom-host:9000/api/chat')
+    expect(url).toBe('http://custom-host:11434/api/chat')
   })
 
   it('uses custom OLLAMA_MODEL from environment', async () => {
     process.env.OLLAMA_MODEL = 'llama3.2'
     const { OllamaProvider } = await import('../providers/OllamaProvider.js')
     const provider = new OllamaProvider()
-    mockFetchResponse({ response: 'ok' })
+    mockFetchResponse({ message: { content: 'ok' } })
 
     await provider.answer({ prompt: 'test', systemInstructions: 'test' })
 
-    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string)
+    const body = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body as string)
     expect(body.model).toBe('llama3.2')
   })
 
-  it('strips trailing slashes from service URL', async () => {
-    process.env.AI_SERVICE_URL = 'http://localhost:8000///'
+  it('strips trailing slashes from base URL', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434///'
     const { OllamaProvider } = await import('../providers/OllamaProvider.js')
     const provider = new OllamaProvider()
-    mockFetchResponse({ response: 'ok' })
+    mockFetchResponse({ message: { content: 'ok' } })
 
     await provider.answer({ prompt: 'test', systemInstructions: 'test' })
 
     const [url] = vi.mocked(globalThis.fetch).mock.calls[0]
-    expect(url).toBe('http://localhost:8000/api/chat')
+    expect(url).toBe('http://localhost:11434/api/chat')
   })
 })
 
@@ -233,7 +237,8 @@ describe('checkOllamaHealth', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {
-    process.env.AI_SERVICE_URL = 'http://localhost:8000'
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+    process.env.OLLAMA_MODEL = 'qwen3:4b'
   })
 
   afterEach(() => {
@@ -243,32 +248,33 @@ describe('checkOllamaHealth', () => {
 
   it('returns connected when Ollama is healthy', async () => {
     mockFetchResponse({
-      ollama_status: 'connected',
-      model: 'gemma3',
-      models: ['gemma3:latest', 'llama3.2:latest'],
+      models: [
+        { name: 'qwen3:4b', size: 2600000000 },
+        { name: 'llama3.2:latest', size: 2000000000 },
+      ],
     })
 
     const { checkOllamaHealth } = await import('../providers/OllamaProvider.js')
     const result = await checkOllamaHealth()
 
     expect(result.status).toBe('connected')
-    expect(result.model).toBe('gemma3')
-    expect(result.models).toEqual(['gemma3:latest', 'llama3.2:latest'])
+    expect(result.model).toBe('qwen3:4b')
+    expect(result.models).toEqual(['qwen3:4b', 'llama3.2:latest'])
   })
 
-  it('returns disconnected when Ollama is not running', async () => {
+  it('returns first model when configured model is not available', async () => {
+    process.env.OLLAMA_MODEL = 'qwen3:4b'
     mockFetchResponse({
-      ollama_status: 'disconnected',
-      model: 'gemma3',
-      models: [],
-      error: 'Cannot connect to Ollama',
+      models: [
+        { name: 'llama3.2:latest', size: 2000000000 },
+      ],
     })
 
     const { checkOllamaHealth } = await import('../providers/OllamaProvider.js')
     const result = await checkOllamaHealth()
 
-    expect(result.status).toBe('disconnected')
-    expect(result.error).toBe('Cannot connect to Ollama')
+    expect(result.status).toBe('connected')
+    expect(result.model).toBe('llama3.2:latest')
   })
 
   it('returns disconnected on network error', async () => {

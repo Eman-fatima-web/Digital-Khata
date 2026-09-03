@@ -16,6 +16,8 @@ import {
   CheckCircle,
   AlertCircle,
   Cpu,
+  Download,
+  Upload,
 } from 'lucide-react'
 
 import { useApp } from '../../hooks/useApp'
@@ -26,6 +28,7 @@ import { useNotificationPreferences } from '../../hooks/useNotificationPreferenc
 import { useAIProvider, fetchOllamaHealth, type OllamaHealthStatus } from '../../hooks/useAIProvider'
 import { clearPin, setPin, verifyPin } from '../../security/pin'
 import { clearAllConversations } from '../../data/repositories/conversationRepo'
+import { exportBackup, downloadBackup, importBackup } from '../../data/services/backupService'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
@@ -45,8 +48,8 @@ function SectionHeader({ children }: { children: string }) {
 
 function Settings() {
   const { t } = useTranslation()
-  const { pinEnabled, setPinEnabled, lock, theme, toggleTheme } = useApp()
-  const { isAuthenticated, user, logout, sendVerification } = useAuth()
+  const { pinEnabled, setPinEnabled, lock, theme, setTheme } = useApp()
+  const { isAuthenticated, user, logout, sendVerification, updateProfile, changePassword } = useAuth()
   const owner = useOwner()
   const { prefs, updatePrefs } = useNotificationPreferences()
   const { provider: aiProvider, setProvider: setAIProvider } = useAIProvider()
@@ -73,6 +76,23 @@ function Settings() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const { toast } = useToast()
+
+  // Profile editing state
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
+    phone: '',
+    shopName: '',
+    address: '',
+    cnic: '',
+  })
+  const [profileBusy, setProfileBusy] = useState(false)
+
+  // Change password state
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwError, setPwError] = useState<string | null>(null)
 
   const bumpPad = (shake: boolean) =>
     setPad((prev) => ({ key: prev.key + 1, shake }))
@@ -192,12 +212,98 @@ function Settings() {
     showToast('success', t('settings.historyCleared'))
   }
 
+  const handleExportBackup = async () => {
+    try {
+      const json = await exportBackup()
+      downloadBackup(json)
+      showToast('success', t('settings.backupExported'))
+    } catch {
+      showToast('error', t('common.error'))
+    }
+  }
+
+  const handleImportBackup = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json,application/json'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      if (!window.confirm(t('settings.backupImportConfirm'))) return
+      try {
+        const text = await file.text()
+        const result = await importBackup(text)
+        if (result.success) {
+          showToast('success', t('settings.backupRestored'))
+        } else {
+          showToast('error', result.error || t('common.error'))
+        }
+      } catch {
+        showToast('error', t('common.error'))
+      }
+    }
+    input.click()
+  }
+
   const handleSendVerification = async () => {
     try {
       await sendVerification()
       showToast('success', t('auth.verifyEmail.resendSuccess'))
     } catch {
       showToast('error', t('common.error'))
+    }
+  }
+
+  const handleOpenProfile = () => {
+    setProfileForm({
+      fullName: user?.fullName ?? '',
+      phone: user?.phone ?? '',
+      shopName: user?.shopName ?? '',
+      address: user?.address ?? '',
+      cnic: user?.cnic ?? '',
+    })
+    setEditingProfile(true)
+  }
+
+  const handleSaveProfile = async () => {
+    setProfileBusy(true)
+    try {
+      await updateProfile({
+        fullName: profileForm.fullName,
+        phone: profileForm.phone || undefined,
+        shopName: profileForm.shopName || undefined,
+        address: profileForm.address || undefined,
+        cnic: profileForm.cnic || undefined,
+      })
+      setEditingProfile(false)
+      showToast('success', t('settings.profileSaved'))
+    } catch {
+      showToast('error', t('common.error'))
+    } finally {
+      setProfileBusy(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPwError(null)
+    if (pwForm.next.length < 8) {
+      setPwError(t('settings.passwordTooShort'))
+      return
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError(t('settings.passwordMismatch'))
+      return
+    }
+    setPwBusy(true)
+    try {
+      await changePassword(pwForm.current, pwForm.next)
+      setShowChangePassword(false)
+      setPwForm({ current: '', next: '', confirm: '' })
+      showToast('success', t('settings.passwordChanged'))
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : t('common.error'))
+    } finally {
+      setPwBusy(false)
     }
   }
 
@@ -272,24 +378,20 @@ function Settings() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm font-semibold text-ink">
-                {theme === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
-              </p>
-              <button
-                role="switch"
-                aria-checked={theme === 'dark'}
-                onClick={toggleTheme}
-                className={`relative h-7 w-12 rounded-full transition ${
-                  theme === 'dark' ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    theme === 'dark' ? 'start-6' : 'start-1'
+            <div className="flex gap-2">
+              {(['light', 'dark', 'system'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    theme === t
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-surface-raised text-ink-muted hover:bg-surface-border'
                   }`}
-                />
-              </button>
+                >
+                  {t === 'light' ? '☀️ Light' : t === 'dark' ? '🌙 Dark' : '💻 System'}
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -324,46 +426,36 @@ function Settings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-ink">{t('settings.dailySalesSummary')}</p>
-                <p className="text-xs text-ink-muted">{t('settings.dailySalesSummaryDesc')}</p>
-              </div>
-              <button
-                role="switch"
-                aria-checked={prefs.dailySalesSummary}
-                onClick={() => updatePrefs({ dailySalesSummary: !prefs.dailySalesSummary })}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  prefs.dailySalesSummary ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    prefs.dailySalesSummary ? 'start-6' : 'start-1'
+            {([
+              { key: 'dailySalesSummary' as const, label: t('settings.dailySalesSummary'), desc: t('settings.dailySalesSummaryDesc') },
+              { key: 'weeklySalesSummary' as const, label: t('settings.weeklySalesSummary'), desc: t('settings.weeklySalesSummaryDesc') },
+              { key: 'monthlySalesSummary' as const, label: t('settings.monthlySalesSummary'), desc: t('settings.monthlySalesSummaryDesc') },
+              { key: 'paymentReminders' as const, label: t('settings.paymentReminders'), desc: t('settings.paymentRemindersDesc') },
+              { key: 'whatsappReminders' as const, label: t('settings.whatsappReminders'), desc: t('settings.whatsappRemindersDesc') },
+              { key: 'smsReminders' as const, label: t('settings.smsReminders'), desc: t('settings.smsRemindersDesc') },
+              { key: 'emailReports' as const, label: t('settings.emailReports'), desc: t('settings.emailReportsDesc') },
+            ]).map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{item.label}</p>
+                  <p className="truncate text-xs text-ink-muted">{item.desc}</p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={prefs[item.key]}
+                  onClick={() => updatePrefs({ [item.key]: !prefs[item.key] })}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                    prefs[item.key] ? 'bg-primary-500' : 'bg-surface-border'
                   }`}
-                />
-              </button>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-ink">{t('settings.paymentReminders')}</p>
-                <p className="text-xs text-ink-muted">{t('settings.paymentRemindersDesc')}</p>
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      prefs[item.key] ? 'start-6' : 'start-1'
+                    }`}
+                  />
+                </button>
               </div>
-              <button
-                role="switch"
-                aria-checked={prefs.paymentReminders}
-                onClick={() => updatePrefs({ paymentReminders: !prefs.paymentReminders })}
-                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  prefs.paymentReminders ? 'bg-primary-500' : 'bg-ink-subtle/40'
-                }`}
-              >
-                <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                    prefs.paymentReminders ? 'start-6' : 'start-1'
-                  }`}
-                />
-              </button>
-            </div>
+            ))}
           </CardContent>
         </Card>
       </section>
@@ -529,9 +621,240 @@ function Settings() {
         </Card>
       </section>
 
+      {/* Profile Section */}
+      {isAuthenticated && (
+        <section className="space-y-3">
+          <SectionHeader>{t('settings.profileSection')}</SectionHeader>
+          <Card>
+            <CardHeader className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
+                <CheckCircle size={20} />
+              </div>
+              <div>
+                <CardTitle>{t('settings.profile')}</CardTitle>
+                <p className="mt-0.5 text-xs text-ink-muted">{t('settings.profileDesc')}</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-ink-muted">{t('settings.fullName')}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">{user?.fullName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-muted">{t('settings.email')}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">{user?.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-muted">{t('settings.phone')}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">{user?.phone || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-muted">{t('settings.shopName')}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">{user?.shopName || '—'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-ink-muted">{t('settings.address')}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ink">{user?.address || '—'}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button size="sm" onClick={handleOpenProfile}>
+                  {t('settings.editProfile')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowChangePassword(true)}>
+                  <Lock size={15} />
+                  {t('settings.changePassword')}
+                </Button>
+              </div>
+
+              {user?.cnic && (
+                <p className="mt-3 flex items-start gap-2 rounded-xl bg-surface p-3 text-xs leading-5 text-ink-muted">
+                  <Info size={14} className="mt-0.5 shrink-0 text-info" />
+                  CNIC: ••••••••••{user.cnic.slice(-4)} — {t('settings.cnicSensitive')}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* Profile Edit Sheet */}
+      <Sheet
+        isOpen={editingProfile}
+        onClose={() => setEditingProfile(false)}
+        title={t('settings.editProfile')}
+        subtitle={t('settings.editProfileDesc')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="profile-name" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.fullName')} <span className="text-danger">*</span>
+            </label>
+            <input
+              id="profile-name"
+              type="text"
+              value={profileForm.fullName}
+              onChange={(e) => setProfileForm((p) => ({ ...p, fullName: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+            />
+          </div>
+          <div>
+            <label htmlFor="profile-phone" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.phone')}
+            </label>
+            <input
+              id="profile-phone"
+              type="tel"
+              inputMode="tel"
+              value={profileForm.phone}
+              onChange={(e) => setProfileForm((p) => ({ ...p, phone: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+              placeholder="03XX XXXXXXX"
+            />
+          </div>
+          <div>
+            <label htmlFor="profile-shop" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.shopName')}
+            </label>
+            <input
+              id="profile-shop"
+              type="text"
+              value={profileForm.shopName}
+              onChange={(e) => setProfileForm((p) => ({ ...p, shopName: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+            />
+          </div>
+          <div>
+            <label htmlFor="profile-address" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.address')}
+            </label>
+            <input
+              id="profile-address"
+              type="text"
+              value={profileForm.address}
+              onChange={(e) => setProfileForm((p) => ({ ...p, address: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+            />
+          </div>
+          <div>
+            <label htmlFor="profile-cnic" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.cnic')} <span className="text-xs text-ink-muted">({t('settings.optional')})</span>
+            </label>
+            <input
+              id="profile-cnic"
+              type="text"
+              value={profileForm.cnic}
+              onChange={(e) => setProfileForm((p) => ({ ...p, cnic: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+              placeholder="XXXXX-XXXXXXX-X"
+            />
+            <p className="mt-2 flex items-start gap-2 rounded-xl bg-surface p-3 text-xs leading-5 text-ink-muted">
+              <Info size={14} className="mt-0.5 shrink-0 text-info" />
+              {t('settings.cnicWarning')}
+            </p>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setEditingProfile(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleSaveProfile} isLoading={profileBusy} disabled={!profileForm.fullName.trim()}>
+              {t('settings.saveProfile')}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+
+      {/* Change Password Sheet */}
+      <Sheet
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        title={t('settings.changePassword')}
+        subtitle={t('settings.changePasswordDesc')}
+      >
+        <div className="space-y-4">
+          {pwError && (
+            <div className="rounded-lg bg-danger/10 px-4 py-3 text-sm text-danger">{pwError}</div>
+          )}
+          <div>
+            <label htmlFor="pw-current" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.currentPassword')}
+            </label>
+            <input
+              id="pw-current"
+              type="password"
+              value={pwForm.current}
+              onChange={(e) => setPwForm((p) => ({ ...p, current: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <label htmlFor="pw-next" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.newPassword')}
+            </label>
+            <input
+              id="pw-next"
+              type="password"
+              value={pwForm.next}
+              onChange={(e) => setPwForm((p) => ({ ...p, next: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label htmlFor="pw-confirm" className="mb-2 block text-sm font-semibold text-ink-light">
+              {t('settings.confirmNewPassword')}
+            </label>
+            <input
+              id="pw-confirm"
+              type="password"
+              value={pwForm.confirm}
+              onChange={(e) => setPwForm((p) => ({ ...p, confirm: e.target.value }))}
+              className="h-11 w-full rounded-xl border border-surface-hairline bg-surface-card px-4 text-sm outline-none transition focus:border-success-300 focus:ring-4 focus:ring-success-400"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowChangePassword(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleChangePassword} isLoading={pwBusy} disabled={!pwForm.current || !pwForm.next || !pwForm.confirm}>
+              {t('settings.changePassword')}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+
       {/* Data Management Section */}
       <section className="space-y-3">
         <SectionHeader>{t('settings.dataManagementSection')}</SectionHeader>
+        <Card>
+          <CardHeader className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-600">
+              <Download size={20} />
+            </div>
+            <div>
+              <CardTitle>{t('settings.backupRestore')}</CardTitle>
+              <p className="mt-0.5 text-xs text-ink-muted">{t('settings.backupRestoreDesc')}</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportBackup}>
+                <Download size={15} />
+                {t('settings.exportBackup')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleImportBackup}>
+                <Upload size={15} />
+                {t('settings.importBackup')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger/10 text-danger">

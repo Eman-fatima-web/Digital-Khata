@@ -2,6 +2,8 @@ import type { KhataEntity, KhataTable, SyncAction } from '../../core/types'
 import { generateId, nowISO } from '../../lib/utils'
 import { db } from '../db/db'
 
+const SYNC_BATCH_SIZE = 100
+
 export async function enqueueSyncAction(
   table: KhataTable,
   recordId: string,
@@ -23,6 +25,10 @@ export async function enqueueSyncAction(
 
 export async function getPendingActions(): Promise<SyncAction[]> {
   return db.syncQueue.orderBy('createdAt').toArray()
+}
+
+export async function getPendingActionsBatch(): Promise<SyncAction[]> {
+  return db.syncQueue.orderBy('createdAt').limit(SYNC_BATCH_SIZE).toArray()
 }
 
 export async function markActionSucceeded(actionId: string): Promise<void> {

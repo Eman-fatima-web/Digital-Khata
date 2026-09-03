@@ -4,7 +4,7 @@
  * Replaceable for future production voice providers
  */
 
-export type VoiceLanguage = 'en' | 'ur' | 'rom' | 'en-UR' // en, ur, rom, or mixed English+Roman Urdu
+export type VoiceLanguage = 'en' | 'ur' | 'en-UR' // en, ur, or mixed English+Urdu
 
 export interface VoiceProvider {
   /**

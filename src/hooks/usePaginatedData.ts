@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { db } from '../data/db/db'
 import type { Customer, Payment, Sale, UdhaarEntry } from '../core/types'
 
 export type PaginationOptions = {
   pageSize?: number
-  cursor?: string
   search?: string
   customerId?: string
   startDate?: string
@@ -15,309 +14,172 @@ export type PaginationOptions = {
 
 export type PaginatedResult<T> = {
   items: T[]
-  nextCursor?: string
   hasMore: boolean
-  total?: number
+  total: number
+  page: number
 }
 
-/**
- * Paginated customers hook with cursor-based pagination
- * Uses indexed queries for efficient pagination
- */
-export function useCustomersPaginated(options: PaginationOptions = {}) {
-  const [result, setResult] = useState<PaginatedResult<Customer> | undefined>()
+export type PaginatedHookReturn<T> = PaginatedResult<T> & {
+  loading: boolean
+  page: number
+  setPage: (page: number) => void
+  nextPage: () => void
+  previousPage: () => void
+}
+
+function usePaginatedQuery<T>(
+  queryFn: (page: number, pageSize: number) => Promise<{ items: T[]; total: number }>,
+  deps: unknown[],
+  pageSize: number,
+): PaginatedHookReturn<T> {
+  const [page, setPage] = useState(0)
+  const [result, setResult] = useState<PaginatedResult<T>>({ items: [], hasMore: false, total: 0, page: 0 })
   const [loading, setLoading] = useState(true)
 
-  const pageSize = options.pageSize ?? 50
+  const depsKey = JSON.stringify(deps)
 
-  const loadPage = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    try {
-      const query = db.customers.filter((c) => !c.isDeleted)
 
-      // Apply search filter if provided
-      if (options.search) {
-        const allCustomers = await query.toArray()
-        const searchLower = options.search.toLowerCase()
-        const filtered = allCustomers.filter(
-          (c) =>
-            c.name.toLowerCase().includes(searchLower) ||
-            c.phone.toLowerCase().includes(searchLower)
-        )
-        
-        // Apply cursor if provided
-        let startIndex = 0
-        if (options.cursor) {
-          const cursorIndex = filtered.findIndex((c) => c.id === options.cursor)
-          if (cursorIndex >= 0) {
-            startIndex = cursorIndex + 1
-          }
-        }
-
-        const items = filtered.slice(startIndex, startIndex + pageSize)
-        const hasMore = startIndex + pageSize < filtered.length
-        const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined
-
-        setResult({
-          items,
-          nextCursor,
-          hasMore,
-          total: filtered.length,
-        })
-      } else {
-        // No search, use simple pagination with cursor
-        const allItems = await db.customers
-          .filter((c) => !c.isDeleted)
-          .toArray()
-        
-        // Sort by name
-        allItems.sort((a, b) => a.name.localeCompare(b.name))
-
-        // Apply cursor if provided
-        let startIndex = 0
-        if (options.cursor) {
-          const cursorIndex = allItems.findIndex((c) => c.id === options.cursor)
-          if (cursorIndex >= 0) {
-            startIndex = cursorIndex + 1
-          }
-        }
-
-        const items = allItems.slice(startIndex, startIndex + pageSize)
-        const hasMore = startIndex + pageSize < allItems.length
-        const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined
-
-        setResult({
-          items,
-          nextCursor,
-          hasMore,
-          total: allItems.length,
-        })
+    void queryFn(page, pageSize).then(({ items, total }) => {
+      if (!cancelled) {
+        setResult({ items, hasMore: (page + 1) * pageSize < total, total, page })
       }
-    } catch (error) {
-      console.error('Error loading customers:', error)
-      setResult({ items: [], hasMore: false })
-    } finally {
-      setLoading(false)
-    }
-  }, [pageSize, options.cursor, options.search])
+    }).catch(() => {
+      if (!cancelled) {
+        setResult({ items: [], hasMore: false, total: 0, page })
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, depsKey])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPage()
-  }, [loadPage])
+    setPage(0)
+  }, [depsKey])
 
-  const loadMore = useCallback(() => {
-    if (result?.hasMore && result?.nextCursor) {
-      // Trigger reload with new cursor by updating options
-      // This will be handled by the parent component
-    }
-  }, [result?.hasMore, result?.nextCursor])
-
-  return { ...result, loading, loadMore }
+  return {
+    ...result,
+    loading,
+    page,
+    setPage,
+    nextPage: () => setPage((p) => p + 1),
+    previousPage: () => setPage((p) => Math.max(0, p - 1)),
+  }
 }
 
-/**
- * Paginated udhaar hook with filters
- */
-export function useUdhaarPaginated(options: PaginationOptions = {}) {
-  const [result, setResult] = useState<PaginatedResult<UdhaarEntry> | undefined>()
-  const [loading, setLoading] = useState(true)
-
+export function useCustomersPaginated(options: PaginationOptions = {}): PaginatedHookReturn<Customer> {
   const pageSize = options.pageSize ?? 50
+  const search = options.search ?? ''
 
-  const loadPage = useCallback(async () => {
-    setLoading(true)
-    try {
-      const query = db.udhaar.filter((e) => !e.isDeleted)
-      let allItems = await query.toArray()
+  return usePaginatedQuery<Customer>(
+    async (page, size) => {
+      const buildQuery = () =>
+        db.customers
+          .orderBy('name')
+          .filter((c) => {
+            if (c.isDeleted) return false
+            if (!search) return true
+            const q = search.toLowerCase()
+            return c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+          })
 
-      if (options.customerId) {
-        allItems = allItems.filter((e) => e.customerId === options.customerId)
-      }
-
-      if (options.outstandingOnly) {
-        allItems = allItems.filter((e) => e.remainingAmount > 0)
-      }
-
-      allItems.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-
-      let startIndex = 0
-      if (options.cursor) {
-        const cursorIndex = allItems.findIndex((e) => e.id === options.cursor)
-        if (cursorIndex >= 0) {
-          startIndex = cursorIndex + 1
-        }
-      }
-
-      const items = allItems.slice(startIndex, startIndex + pageSize)
-      const hasMore = startIndex + pageSize < allItems.length
-      const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined
-
-      setResult({
-        items,
-        nextCursor,
-        hasMore,
-        total: allItems.length,
-      })
-    } catch (error) {
-      console.error('Error loading udhaar:', error)
-      setResult({ items: [], hasMore: false })
-    } finally {
-      setLoading(false)
-    }
-  }, [pageSize, options.cursor, options.customerId, options.outstandingOnly])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPage()
-  }, [loadPage])
-
-  const loadMore = useCallback(() => {
-    if (result?.hasMore && result?.nextCursor) {
-      // Trigger reload with new cursor by updating options
-      // This will be handled by the parent component
-    }
-  }, [result?.hasMore, result?.nextCursor])
-
-  return { ...result, loading, loadMore }
+      const total = await buildQuery().count()
+      const items = await buildQuery().offset(page * size).limit(size).toArray()
+      return { items, total }
+    },
+    [search],
+    pageSize,
+  )
 }
 
-/**
- * Paginated payments hook with filters
- */
-export function usePaymentsPaginated(options: PaginationOptions = {}) {
-  const [result, setResult] = useState<PaginatedResult<Payment> | undefined>()
-  const [loading, setLoading] = useState(true)
-
+export function useUdhaarPaginated(options: PaginationOptions = {}): PaginatedHookReturn<UdhaarEntry> {
   const pageSize = options.pageSize ?? 50
+  const customerId = options.customerId ?? ''
+  const outstandingOnly = options.outstandingOnly ?? false
 
-  const loadPage = useCallback(async () => {
-    setLoading(true)
-    try {
-      const query = db.payments.filter((p) => !p.isDeleted)
-      let allItems = await query.toArray()
+  return usePaginatedQuery<UdhaarEntry>(
+    async (page, size) => {
+      const buildQuery = () =>
+        db.udhaar
+          .orderBy('createdAt')
+          .reverse()
+          .filter((e) => {
+            if (e.isDeleted) return false
+            if (customerId && e.customerId !== customerId) return false
+            if (outstandingOnly && e.remainingAmount <= 0) return false
+            return true
+          })
 
-      if (options.customerId) {
-        allItems = allItems.filter((p) => p.customerId === options.customerId)
-      }
-
-      if (options.startDate || options.endDate) {
-        allItems = allItems.filter((p) => {
-          if (options.startDate && p.date < options.startDate) return false
-          if (options.endDate && p.date > options.endDate) return false
-          return true
-        })
-      }
-
-      allItems.sort((a, b) => b.date.localeCompare(a.date))
-
-      let startIndex = 0
-      if (options.cursor) {
-        const cursorIndex = allItems.findIndex((p) => p.id === options.cursor)
-        if (cursorIndex >= 0) {
-          startIndex = cursorIndex + 1
-        }
-      }
-
-      const items = allItems.slice(startIndex, startIndex + pageSize)
-      const hasMore = startIndex + pageSize < allItems.length
-      const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined
-
-      setResult({
-        items,
-        nextCursor,
-        hasMore,
-        total: allItems.length,
-      })
-    } catch (error) {
-      console.error('Error loading payments:', error)
-      setResult({ items: [], hasMore: false })
-    } finally {
-      setLoading(false)
-    }
-  }, [pageSize, options.cursor, options.customerId, options.startDate, options.endDate])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPage()
-  }, [loadPage])
-
-  const loadMore = useCallback(() => {
-    if (result?.hasMore && result?.nextCursor) {
-      // Trigger reload with new cursor by updating options
-      // This will be handled by the parent component
-    }
-  }, [result?.hasMore, result?.nextCursor])
-
-  return { ...result, loading, loadMore }
+      const total = await buildQuery().count()
+      const items = await buildQuery().offset(page * size).limit(size).toArray()
+      return { items, total }
+    },
+    [customerId, outstandingOnly],
+    pageSize,
+  )
 }
 
-/**
- * Paginated sales hook with filters
- */
-export function useSalesPaginated(options: PaginationOptions = {}) {
-  const [result, setResult] = useState<PaginatedResult<Sale> | undefined>()
-  const [loading, setLoading] = useState(true)
-
+export function usePaymentsPaginated(options: PaginationOptions = {}): PaginatedHookReturn<Payment> {
   const pageSize = options.pageSize ?? 50
+  const customerId = options.customerId ?? ''
+  const startDate = options.startDate ?? ''
+  const endDate = options.endDate ?? ''
 
-  const loadPage = useCallback(async () => {
-    setLoading(true)
-    try {
-      const query = db.sales.filter((s) => !s.isDeleted)
-      let allItems = await query.toArray()
+  return usePaginatedQuery<Payment>(
+    async (page, size) => {
+      const buildQuery = () =>
+        db.payments
+          .orderBy('date')
+          .reverse()
+          .filter((p) => {
+            if (p.isDeleted) return false
+            if (customerId && p.customerId !== customerId) return false
+            if (startDate && p.date < startDate) return false
+            if (endDate && p.date > endDate) return false
+            return true
+          })
 
-      if (options.customerId) {
-        allItems = allItems.filter((s) => s.customerId === options.customerId)
-      }
+      const total = await buildQuery().count()
+      const items = await buildQuery().offset(page * size).limit(size).toArray()
+      return { items, total }
+    },
+    [customerId, startDate, endDate],
+    pageSize,
+  )
+}
 
-      if (options.startDate || options.endDate) {
-        allItems = allItems.filter((s) => {
-          if (options.startDate && s.date < options.startDate) return false
-          if (options.endDate && s.date > options.endDate) return false
-          return true
-        })
-      }
+export function useSalesPaginated(options: PaginationOptions = {}): PaginatedHookReturn<Sale> {
+  const pageSize = options.pageSize ?? 50
+  const customerId = options.customerId ?? ''
+  const startDate = options.startDate ?? ''
+  const endDate = options.endDate ?? ''
 
-      allItems.sort((a, b) => b.date.localeCompare(a.date))
+  return usePaginatedQuery<Sale>(
+    async (page, size) => {
+      const buildQuery = () =>
+        db.sales
+          .orderBy('date')
+          .reverse()
+          .filter((s) => {
+            if (s.isDeleted) return false
+            if (customerId && s.customerId !== customerId) return false
+            if (startDate && s.date < startDate) return false
+            if (endDate && s.date > endDate) return false
+            return true
+          })
 
-      let startIndex = 0
-      if (options.cursor) {
-        const cursorIndex = allItems.findIndex((s) => s.id === options.cursor)
-        if (cursorIndex >= 0) {
-          startIndex = cursorIndex + 1
-        }
-      }
-
-      const items = allItems.slice(startIndex, startIndex + pageSize)
-      const hasMore = startIndex + pageSize < allItems.length
-      const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].id : undefined
-
-      setResult({
-        items,
-        nextCursor,
-        hasMore,
-        total: allItems.length,
-      })
-    } catch (error) {
-      console.error('Error loading sales:', error)
-      setResult({ items: [], hasMore: false })
-    } finally {
-      setLoading(false)
-    }
-  }, [pageSize, options.cursor, options.customerId, options.startDate, options.endDate])
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPage()
-  }, [loadPage])
-
-  const loadMore = useCallback(() => {
-    if (result?.hasMore && result?.nextCursor) {
-      // Trigger reload with new cursor by updating options
-      // This will be handled by the parent component
-    }
-  }, [result?.hasMore, result?.nextCursor])
-
-  return { ...result, loading, loadMore }
+      const total = await buildQuery().count()
+      const items = await buildQuery().offset(page * size).limit(size).toArray()
+      return { items, total }
+    },
+    [customerId, startDate, endDate],
+    pageSize,
+  )
 }

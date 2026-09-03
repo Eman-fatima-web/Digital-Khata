@@ -203,6 +203,11 @@ const salesSeed: Sale[] = [
 ]
 
 export async function seedDatabase(): Promise<boolean> {
+  const authData = localStorage.getItem('dk-auth')
+  if (authData) {
+    return false
+  }
+
   if (localStorage.getItem(STORAGE_KEYS.MIGRATED) === 'seeded') {
     return false
   }

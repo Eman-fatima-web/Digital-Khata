@@ -24,6 +24,19 @@ export async function processInput(
   // Run the local engine first with pronoun resolution
   let result = runEngine(input, data, language, resolvedCustomerName)
 
+  // Active-customer fallback: if the engine needs a customer and we have an active
+  // one from context, retry with that customer name injected
+  if (result.type === 'clarification' && !resolvedCustomerName) {
+    const activeName = context.activeCustomerName ?? context.lastCustomerName
+    if (activeName) {
+      const retry = runEngine(input, data, language, activeName)
+      if (retry.type !== 'clarification') {
+        result = retry
+        resolvedCustomerName = activeName
+      }
+    }
+  }
+
   // Compound intent splitting: if the engine returns UNKNOWN, try splitting
   // the input on conjunctions and process each part independently
   if (result.type === 'fallback') {
@@ -103,6 +116,18 @@ function updateContext(
   let activeCustomerName = context.activeCustomerName
   let pendingConfirmation = context.pendingConfirmation
   let lastReportType = context.lastReportType
+
+  // If the result has a proposal with a customer, update context
+  // But first: if the active customer from context no longer exists in the snapshot
+  // (was deleted), we must clear it to prevent stale financial data references.
+  const activeStillExists = !context.activeCustomerId
+    || data.customers.some((c) => c.id === context.activeCustomerId)
+  if (!activeStillExists) {
+    activeCustomerId = undefined
+    activeCustomerName = undefined
+    lastCustomerId = undefined
+    lastCustomerName = undefined
+  }
 
   // If the result has a proposal with a customer, update context
   if (result.type === 'proposal' && result.proposal.customerId) {

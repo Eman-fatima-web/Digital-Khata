@@ -31,23 +31,19 @@ function makeSnapshot(overrides: Partial<KhataSnapshot> = {}): KhataSnapshot {
 
 describe('Phase 6: Report System', () => {
   it('detects WEEKLY_REPORT intent', () => {
-    expect(detectIntent('weekly report dikhao')).toBe('WEEKLY_REPORT')
-    expect(detectIntent('hafte ki report')).toBe('WEEKLY_REPORT')
+    expect(detectIntent('weekly report')).toBe('WEEKLY_REPORT')
   })
 
   it('detects MONTHLY_REPORT intent', () => {
-    expect(detectIntent('monthly report batao')).toBe('MONTHLY_REPORT')
-    expect(detectIntent('mahine ki report')).toBe('MONTHLY_REPORT')
+    expect(detectIntent('monthly report')).toBe('MONTHLY_REPORT')
   })
 
   it('detects OUTSTANDING_REPORT intent', () => {
-    expect(detectIntent('outstanding report dikhao')).toBe('OUTSTANDING_REPORT')
-    expect(detectIntent('baqi report')).toBe('OUTSTANDING_REPORT')
+    expect(detectIntent('outstanding report')).toBe('OUTSTANDING_REPORT')
   })
 
   it('detects CUSTOMER_REPORT intent', () => {
-    expect(detectIntent('customer report dikhao')).toBe('CUSTOMER_REPORT')
-    expect(detectIntent('gahak report')).toBe('CUSTOMER_REPORT')
+    expect(detectIntent('customer report')).toBe('CUSTOMER_REPORT')
   })
 
   it('generates weekly report with cardData', () => {
@@ -59,7 +55,7 @@ describe('Phase 6: Report System', () => {
         createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('weekly report dikhao', data, 'en')
+    const result = runEngine('weekly report', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer' && result.cardData) {
       expect(result.cardData.kind).toBe('report')
@@ -77,7 +73,7 @@ describe('Phase 6: Report System', () => {
         createdAt: '', updatedAt: '', syncStatus: 'synced', version: 1,
       }],
     })
-    const result = runEngine('monthly report batao', data, 'en')
+    const result = runEngine('monthly report', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer' && result.cardData) {
       expect(result.cardData.kind).toBe('report')
@@ -104,7 +100,7 @@ describe('Phase 6: Report System', () => {
         },
       ],
     })
-    const result = runEngine('outstanding report dikhao', data, 'en')
+    const result = runEngine('outstanding report', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer' && result.cardData) {
       expect(result.cardData.kind).toBe('report')
@@ -127,7 +123,7 @@ describe('Phase 6: Report System', () => {
         },
       ],
     })
-    const result = runEngine('customer report dikhao', data, 'en')
+    const result = runEngine('customer report', data, 'en')
     expect(result.type).toBe('answer')
     if (result.type === 'answer' && result.cardData) {
       expect(result.cardData.kind).toBe('report')
@@ -143,11 +139,11 @@ describe('Phase 6: Context Minimization', () => {
     const data = makeSnapshot({ customers: [ahmed] })
 
     // Can query existing customer
-    const result1 = runEngine('Ahmed ka balance batao', data, 'en')
+    const result1 = runEngine('Ahmed balance', data, 'en')
     expect(result1.type).toBe('answer')
 
     // Cannot access non-existent customer data
-    const result2 = runEngine('NonExistent ka balance batao', data, 'en')
+    const result2 = runEngine('NonExistent balance', data, 'en')
     expect(result2.type).toBe('answer') // Falls back to totals
   })
 })
@@ -160,7 +156,7 @@ describe('Phase 6: Tenant Isolation (Frontend)', () => {
     const tenant1Data = makeSnapshot({ customers: [customer1] })
     
     // Query should only see tenant 1's data
-    const result = runEngine('Customer 2 ka balance batao', tenant1Data, 'en')
+    const result = runEngine('Customer 2 balance', tenant1Data, 'en')
     expect(result.type).toBe('answer')
     // Should not contain Customer 2 data
     if (result.type === 'answer') {

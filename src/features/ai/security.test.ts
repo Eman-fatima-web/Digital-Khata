@@ -57,7 +57,7 @@ describe('Security: Prompt Injection Defense', () => {
     expect(detectInjection('Ahmed Khan')).toBe(false)
     expect(detectInjection('Payment of Rs. 5000 received')).toBe(false)
     expect(detectInjection('Daily essentials purchase')).toBe(false)
-    expect(detectInjection('Ahmed ne 2000 diye hain')).toBe(false)
+    expect(detectInjection('Ahmed paid 2000 today')).toBe(false)
     expect(detectInjection('آج کی فروخت 25000 روپے ہے')).toBe(false)
   })
 
@@ -200,11 +200,11 @@ describe('Security: Data Isolation', () => {
     const data = makeSnapshot([ahmed])
 
     // Can query existing customer
-    const result1 = runEngine('Ahmed ka balance batao', data, 'en')
+    const result1 = runEngine('Ahmed balance', data, 'en')
     expect(result1.type).toBe('answer')
 
     // Cannot access non-existent customer data
-    const result2 = runEngine('NonExistent ka balance batao', data, 'en')
+    const result2 = runEngine('NonExistent balance', data, 'en')
     // Falls back to totals — does not leak data about other customers
     expect(result2.type).toBe('answer')
   })

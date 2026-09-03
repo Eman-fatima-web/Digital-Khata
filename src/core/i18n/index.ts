@@ -1,9 +1,8 @@
 import { useApp } from '../../hooks/useApp'
 import { en } from './en'
 import { ur } from './ur'
-import { rom } from './rom'
 
-const translations = { en, ur, rom }
+const translations = { en, ur }
 
 type NestedKeyOf<ObjectType extends object> = {
   [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
@@ -15,7 +14,7 @@ export type TranslationKey = NestedKeyOf<typeof en>
 
 export function t(
   key: TranslationKey,
-  language: 'en' | 'ur' | 'rom' = 'en',
+  language: 'en' | 'ur' = 'en',
   params?: Record<string, string | number>,
 ): string {
   const keys = key.split('.')

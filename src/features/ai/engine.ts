@@ -5,6 +5,7 @@ import {
   detectMethod,
   detectNewCustomer,
   extractAmount,
+  hasNameTokens,
   isInExpandedPeriod,
   isInPeriod,
   localToday,
@@ -27,13 +28,36 @@ export function runEngine(
 
   // If the orchestrator resolved a pronoun to a customer name, use that for matching
   const effectiveInput = resolvedCustomerName
-    ? input.replace(/\b(us ne|us ko|us ka|us ki|uske|uski|uska|usse|woh|wo|ye|yeh|him|her|them|he|she|it|they|that customer|the same|same customer|usko|usne|اس نے|اس کو|اس کا|اس کی|وہ|یہ|انہوں نے|ان کو)\b/gi, resolvedCustomerName)
+    ? input.replace(/\b(him|her|them|he|she|it|they|that customer|the same|same customer|اس نے|اس کو|اس کا|اس کی|وہ|یہ|انہوں نے|ان کو)\b/gi, resolvedCustomerName)
     : input
   const match = matchCustomers(effectiveInput, data.customers)
 
-  const customer = match.status === 'unique' ? match.customer : undefined
+  // When the orchestrator provides a resolved customer but the input has no name
+  // tokens (e.g. "receive 2000 payment" with active customer), use the resolved customer
+  const resolvedCustomer = resolvedCustomerName
+    ? data.customers.find((c) => normalize(c.name) === normalize(resolvedCustomerName))
+    : undefined
+  const customer = match.status === 'unique'
+    ? match.customer
+    : match.status === 'none' && resolvedCustomer
+      ? resolvedCustomer
+      : undefined
   const clarify = (candidates: Customer[]) =>
     ({ type: 'clarification', text: r.clarifyCustomers(candidates.map((c) => c.name)) }) as AIResult
+  const notFound = (name: string) =>
+    ({ type: 'answer', text: r.customerNotFound(name) }) as AIResult
+
+  // When no customer matched, decide whether the user mentioned a name
+  // (→ "X is not in your Khata") or didn't mention one (→ "Which customer?")
+  const noCustomer = (): AIResult => {
+    if (match.status === 'none' && hasNameTokens(input)) {
+      const normalizedInput = normalize(input)
+      const tokens = normalizedInput.split(' ').filter((t) => t.length > 1)
+      const candidate = tokens.find((t) => data.customers.some((c) => normalize(c.name).includes(t))) ?? tokens[0]
+      if (candidate) return notFound(candidate)
+    }
+    return { type: 'clarification', text: r.askCustomer() }
+  }
 
   const udhaarFor = (id: string) => data.udhaar.filter((e) => e.customerId === id)
   const outstandingFor = (id: string) =>
@@ -58,7 +82,7 @@ export function runEngine(
   switch (intent) {
     case 'RECORD_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const amount = extractAmount(input)
       if (!amount || amount <= 0) return { type: 'clarification', text: r.askAmount() }
@@ -86,7 +110,7 @@ export function runEngine(
 
     case 'ADD_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const amount = extractAmount(input)
       if (!amount || amount <= 0) return { type: 'clarification', text: r.askAmount() }
@@ -104,7 +128,7 @@ export function runEngine(
 
     case 'DELETE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noPaymentsToDelete(customer.name) }
@@ -123,7 +147,7 @@ export function runEngine(
 
     case 'DELETE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = outstandingFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noUdhaarEntries(customer.name) }
@@ -149,7 +173,7 @@ export function runEngine(
 
     case 'SEND_REMINDER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const outstanding = outstandingFor(customer.id).reduce((sum, e) => sum + e.remainingAmount, 0)
       if (outstanding === 0) return { type: 'answer', text: r.noOutstanding(customer.name) }
@@ -208,8 +232,8 @@ export function runEngine(
       return { type: 'answer', text: businessInsightAnswer(data, language) }
 
     case 'WEEKLY_SALES': {
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
+      const now = new Date()
+      const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
       const weekSales = data.sales.filter((s) => new Date(s.date) >= weekAgo && !s.isDeleted)
       const total = weekSales.reduce((sum, s) => sum + s.amount, 0)
       return {
@@ -221,8 +245,8 @@ export function runEngine(
     }
 
     case 'MONTHLY_SALES': {
-      const monthStart = new Date()
-      monthStart.setDate(1)
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
       const monthSales = data.sales.filter((s) => new Date(s.date) >= monthStart && !s.isDeleted)
       const total = monthSales.reduce((sum, s) => sum + s.amount, 0)
       return {
@@ -313,7 +337,7 @@ export function runEngine(
 
     case 'CREDIT_ADVICE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       const outstanding = entries.reduce((sum, e) => sum + e.remainingAmount, 0)
@@ -376,8 +400,8 @@ export function runEngine(
     }
 
     case 'WEEKLY_REPORT': {
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
+      const now = new Date()
+      const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
       const weekSales = data.sales.filter((s) => new Date(s.date) >= weekAgo && !s.isDeleted)
       const weekPayments = data.payments.filter((p) => new Date(p.date) >= weekAgo && !p.isDeleted)
       const totalOutstanding = data.udhaar.reduce((sum, e) => sum + Math.max(0, e.remainingAmount), 0)
@@ -407,8 +431,8 @@ export function runEngine(
     }
 
     case 'MONTHLY_REPORT': {
-      const monthStart = new Date()
-      monthStart.setDate(1)
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
       const monthSales = data.sales.filter((s) => new Date(s.date) >= monthStart && !s.isDeleted)
       const monthPayments = data.payments.filter((p) => new Date(p.date) >= monthStart && !p.isDeleted)
       const totalOutstanding = data.udhaar.reduce((sum, e) => sum + Math.max(0, e.remainingAmount), 0)
@@ -499,8 +523,8 @@ export function runEngine(
     case 'RECEIVED_REPORT': {
       const today = localToday()
       const normInput = input.toLowerCase()
-      const isWeekly = ['week', 'hafte', 'ہفتے'].some(t => normInput.includes(t))
-      const isMonthly = ['month', 'mahine', 'مہینے'].some(t => normInput.includes(t))
+      const isWeekly = ['week', 'ہفتے'].some(t => normInput.includes(t))
+      const isMonthly = ['month', 'مہینے'].some(t => normInput.includes(t))
 
       let startDate: string
       let periodLabel: string
@@ -821,9 +845,35 @@ export function runEngine(
       }
     }
 
+    case 'SET_NOTIFICATION_PREFS': {
+      const prefs = extractNotificationPrefs(input)
+      if (Object.keys(prefs).length === 0) {
+        return { type: 'clarification', text: language === 'ur'
+          ? 'کون سی نوٹیفکیشن؟ ڈیلی سمیری، ہفتے کی رپورٹ، یا یاد دہانی؟'
+          : 'Which notification? Daily summary, weekly report, or reminders?' }
+      }
+      const changes = Object.entries(prefs).map(([k, v]) => `${k}: ${v ? 'on' : 'off'}`).join(', ')
+      const proposal: ActionProposal = {
+        kind: 'SET_NOTIFICATION_PREFS',
+        setting: 'notifications',
+        notificationPrefs: prefs,
+        note: {
+          en: `Update notifications: ${changes}`,
+          ur: `نوٹیفکیشن تبدیل کریں: ${changes}`,
+        },
+      }
+      return {
+        type: 'proposal',
+        text: language === 'ur'
+          ? `نوٹیفکیشن تبدیل کروں؟ ${changes}`
+          : `Update notification preferences? ${changes}`,
+        proposal,
+      }
+    }
+
     case 'DELETE_SALE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = salesFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noSalesToDelete(customer.name) }
@@ -841,7 +891,7 @@ export function runEngine(
 
     case 'RESTORE_CUSTOMER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const proposal: ActionProposal = {
         kind: 'RESTORE_CUSTOMER',
@@ -853,7 +903,7 @@ export function runEngine(
 
     case 'RESTORE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noDeletedUdhaar(customer.name) }
@@ -871,7 +921,7 @@ export function runEngine(
 
     case 'RESTORE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noDeletedPayment(customer.name) }
@@ -889,7 +939,7 @@ export function runEngine(
 
     case 'RESTORE_SALE': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = salesFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noDeletedSale(customer.name) }
@@ -907,7 +957,7 @@ export function runEngine(
 
     case 'UPDATE_CUSTOMER': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const proposal: ActionProposal = {
         kind: 'UPDATE_CUSTOMER',
@@ -923,7 +973,7 @@ export function runEngine(
 
     case 'UPDATE_UDHAAR': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const entries = udhaarFor(customer.id)
       if (entries.length === 0) return { type: 'answer', text: r.noUdhaarToUpdate(customer.name) }
@@ -942,7 +992,7 @@ export function runEngine(
 
     case 'UPDATE_PAYMENT': {
       if (match.status === 'ambiguous') return clarify(match.candidates)
-      if (!customer) return { type: 'clarification', text: r.askCustomer() }
+      if (!customer) return noCustomer()
 
       const latest = paymentsFor(customer.id)[0]
       if (!latest) return { type: 'answer', text: r.noPaymentToUpdate(customer.name) }
@@ -964,10 +1014,10 @@ export function runEngine(
 }
 
 const PAGE_MAP: Record<string, string> = {
-  customers: '/customers', gahak: '/customers', 'گاہک': '/customers',
+  customers: '/customers', 'گاہک': '/customers',
   udhaar: '/udhaar', 'ادھار': '/udhaar',
-  payments: '/payments', adaigi: '/payments', 'ادائیگی': '/payments',
-  sales: '/sales', bikri: '/sales', 'فروخت': '/sales',
+  payments: '/payments', 'ادائیگی': '/payments',
+  sales: '/sales', 'فروخت': '/sales',
   reports: '/reports', report: '/reports', 'رپورٹ': '/reports',
   reminders: '/reminders', reminder: '/reminders', 'یاد دہانی': '/reminders',
   settings: '/settings', 'ترتیبات': '/settings',
@@ -985,14 +1035,64 @@ function extractNavigationPath(input: string): string | undefined {
 
 function extractTheme(input: string): 'light' | 'dark' | undefined {
   const norm = normalize(input)
-  if (norm.includes('dark') || norm.includes('kala') || norm.includes('اندھیرا')) return 'dark'
-  if (norm.includes('light') || norm.includes('safed') || norm.includes('roshan')) return 'light'
+  if (norm.includes('dark') || norm.includes('اندھیرا')) return 'dark'
+  if (norm.includes('light') || norm.includes('روشن')) return 'light'
   return undefined
 }
 
 function extractLanguage(input: string): 'en' | 'ur' | undefined {
   const norm = normalize(input)
   if (norm.includes('urdu') || norm.includes('اردو')) return 'ur'
-  if (norm.includes('english') || norm.includes('انگریزی') || norm.includes('angrezi')) return 'en'
+  if (norm.includes('english') || norm.includes('انگریزی')) return 'en'
   return undefined
+}
+
+function extractNotificationPrefs(input: string): Record<string, boolean> {
+  const norm = normalize(input)
+  const prefs: Record<string, boolean> = {}
+
+  const enable = norm.includes('turn on') || norm.includes('enable') || norm.includes('start') || norm.includes('چالو کرو') || norm.includes('شروع')
+  const disable = norm.includes('turn off') || norm.includes('disable') || norm.includes('stop') || norm.includes('بند کرو') || norm.includes('بند')
+
+  if (!enable && !disable) return prefs
+
+  const value = enable && !disable
+
+  if (norm.includes('daily') || norm.includes('دن کی') || norm.includes('روزانہ')) {
+    if (norm.includes('summary') || norm.includes('رپورٹ') || norm.includes('حساب')) {
+      prefs.dailySalesSummary = value
+    }
+  }
+  if (norm.includes('weekly') || norm.includes('ہفتے')) {
+    if (norm.includes('summary') || norm.includes('رپورٹ')) {
+      prefs.weeklySalesSummary = value
+    }
+  }
+  if (norm.includes('monthly') || norm.includes('مہینے')) {
+    if (norm.includes('summary') || norm.includes('رپورٹ')) {
+      prefs.monthlySalesSummary = value
+    }
+  }
+  if (norm.includes('payment') || norm.includes('ادائیگی')) {
+    if (norm.includes('reminder') || norm.includes('یاد دہانی')) {
+      prefs.paymentReminders = value
+    }
+  }
+  if (norm.includes('whatsapp')) {
+    if (norm.includes('reminder') || norm.includes('یاد دہانی')) {
+      prefs.whatsappReminders = value
+    }
+  }
+  if (norm.includes('sms')) {
+    if (norm.includes('reminder') || norm.includes('یاد دہانی')) {
+      prefs.smsReminders = value
+    }
+  }
+  if (norm.includes('email') || norm.includes('ای میل')) {
+    if (norm.includes('report') || norm.includes('رپورٹ')) {
+      prefs.emailReports = value
+    }
+  }
+
+  return prefs
 }

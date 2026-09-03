@@ -12,6 +12,8 @@ export default function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [registered, setRegistered] = useState(false)
@@ -22,7 +24,7 @@ export default function Register() {
     e.preventDefault()
     setError(null)
 
-    if (!email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword || !fullName) {
       setError('Please fill in all required fields')
       return
     }
@@ -38,7 +40,7 @@ export default function Register() {
     }
 
     try {
-      await register(email, password, businessName || undefined)
+      await register(email, password, fullName, phone || undefined, businessName || undefined)
       try {
         await sendVerification()
       } catch {
@@ -128,6 +130,22 @@ export default function Register() {
             )}
 
             <div className="space-y-2">
+              <label htmlFor="fullName" className="text-sm font-medium text-ink">
+                Full Name <span className="text-danger">*</span>
+              </label>
+              <input
+                id="fullName"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                placeholder="Your full name"
+                autoComplete="name"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-ink">
                 Email
               </label>
@@ -139,6 +157,22 @@ export default function Register() {
                 className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                 placeholder="you@example.com"
                 autoComplete="email"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="phone" className="text-sm font-medium text-ink">
+                Phone <span className="text-ink-muted">(recommended)</span>
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                placeholder="03XX XXXXXXX"
+                autoComplete="tel"
                 disabled={isLoading}
               />
             </div>

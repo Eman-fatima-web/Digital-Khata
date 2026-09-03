@@ -116,51 +116,50 @@ describe('Tool Permission System', () => {
 
 describe('Navigation Intent', () => {
   it('detects navigation intent for customers', () => {
-    expect(detectIntent('customers kholo')).toBe('NAVIGATE')
-    expect(detectIntent('gahak dikhao')).toBe('NAVIGATE')
+    expect(detectIntent('open customers')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for udhaar', () => {
-    expect(detectIntent('udhaar kholo')).toBe('NAVIGATE')
+    expect(detectIntent('open udhaar')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for payments', () => {
-    expect(detectIntent('payments dikhao')).toBe('NAVIGATE')
+    expect(detectIntent('open payments')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for reports', () => {
-    expect(detectIntent('reports kholo')).toBe('NAVIGATE')
+    expect(detectIntent('open reports')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for sales', () => {
-    expect(detectIntent('sales dikhao')).toBe('NAVIGATE')
+    expect(detectIntent('open sales')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for reminders', () => {
-    expect(detectIntent('reminders kholo')).toBe('NAVIGATE')
+    expect(detectIntent('open reminders')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for settings', () => {
-    expect(detectIntent('settings kholo')).toBe('NAVIGATE')
+    expect(detectIntent('open settings')).toBe('NAVIGATE')
   })
 
   it('detects navigation intent for dashboard', () => {
-    expect(detectIntent('dashboard dikhao')).toBe('NAVIGATE')
+    expect(detectIntent('open dashboard')).toBe('NAVIGATE')
   })
 
   it('does not detect navigation for questions', () => {
-    expect(detectIntent('customers kahan hain?')).not.toBe('NAVIGATE')
+    expect(detectIntent('where are customers?')).not.toBe('NAVIGATE')
   })
 })
 
 describe('Theme Intent', () => {
   it('detects dark theme intent', () => {
-    expect(detectIntent('theme dark kar do')).toBe('SET_THEME')
+    expect(detectIntent('theme dark')).toBe('SET_THEME')
     expect(detectIntent('dark mode')).toBe('SET_THEME')
   })
 
   it('detects light theme intent', () => {
-    expect(detectIntent('theme light kar do')).toBe('SET_THEME')
+    expect(detectIntent('theme light')).toBe('SET_THEME')
     expect(detectIntent('light mode')).toBe('SET_THEME')
   })
 })

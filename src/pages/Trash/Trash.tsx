@@ -11,6 +11,7 @@ import { getDeletedSales, restoreSale } from '../../data/repositories/saleRepo'
 import { Button } from '../../components/ui/Button'
 import { Card, CardContent } from '../../components/ui/Card'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { PageLoader } from '../../components/ui/PageLoader'
 
 type Tab = 'customers' | 'udhaar' | 'payments' | 'sales'
 
@@ -22,6 +23,7 @@ export default function Trash() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [restoringId, setRestoringId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   async function loadAll() {
     const [c, u, p, s] = await Promise.all([
@@ -34,6 +36,7 @@ export default function Trash() {
     setUdhaar(u)
     setPayments(p)
     setSales(s)
+    setLoading(false)
   }
 
   async function handleRestore(id: string) {
@@ -76,6 +79,8 @@ export default function Trash() {
 
   const totalCount = customers.length + udhaar.length + payments.length + sales.length
 
+  if (loading) return <PageLoader />
+
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 pb-24">
       <div>
@@ -93,7 +98,7 @@ export default function Trash() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-primary text-white'
+                  ? 'bg-primary-500 text-white'
                   : 'bg-surface text-ink-muted hover:bg-surface-hover'
               }`}
             >

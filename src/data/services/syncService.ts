@@ -12,7 +12,7 @@ import type { CloudProvider } from '../cloud/CloudProvider'
 import type { SyncConflict } from '../cloud/CloudProvider'
 import { restCloudProvider } from '../cloud/restCloudProvider'
 import {
-  getPendingActions,
+  getPendingActionsBatch,
   markActionFailed,
   markActionSucceeded,
 } from '../repositories/syncQueueRepo'
@@ -84,15 +84,16 @@ class SyncService {
     this.setState('syncing')
 
     try {
-      const pending = await getPendingActions()
-      if (pending.length > 0) {
-        const pushResult = await this.provider.push(pending)
+      let batch = await getPendingActionsBatch()
+      while (batch.length > 0) {
+        const pushResult = await this.provider.push(batch)
         if (!pushResult.success) {
-          await this.handlePushFailure(pending, pushResult.error)
+          await this.handlePushFailure(batch, pushResult.error)
           this.setState('error')
           return false
         }
-        await this.handlePushSuccess(pending, pushResult.conflicts ?? [])
+        await this.handlePushSuccess(batch, pushResult.conflicts ?? [])
+        batch = await getPendingActionsBatch()
       }
 
       const since = getLastSyncAt()

@@ -40,10 +40,10 @@ describe('orchestrator', () => {
     it('returns a greeting for greeting input', async () => {
       const context = createEmptyContext()
       const data = makeSnapshot()
-      const { result } = await processInput('salam', context, data, 'en', true)
+      const { result } = await processInput('hello', context, data, 'en', true)
       expect(result.type).toBe('answer')
       if (result.type === 'answer') {
-        expect(result.text.toLowerCase()).toContain('salam')
+        expect(result.text.toLowerCase()).toContain('hello')
       }
     })
 
@@ -53,7 +53,7 @@ describe('orchestrator', () => {
       const data = makeSnapshot([ahmed])
 
       const { result, updatedContext } = await processInput(
-        'Ahmed ka balance batao',
+        'Ahmed balance',
         context,
         data,
         'en',
@@ -72,17 +72,16 @@ describe('orchestrator', () => {
 
       // First query establishes context
       const { updatedContext } = await processInput(
-        'Ahmed ka balance batao',
+        'Ahmed balance',
         context,
         data,
         'en',
         true,
       )
 
-      // Second query uses pronoun — should resolve to Ahmed
-      // Note: The actual behavior depends on intent detection and engine logic
+      // Second query uses context — should resolve to Ahmed
       const { updatedContext: ctx2 } = await processInput(
-        'us ko udhaar do 5000',
+        'add credit 5000',
         updatedContext,
         data,
         'en',
@@ -99,7 +98,7 @@ describe('orchestrator', () => {
       const data = makeSnapshot([ahmed])
 
       const { result } = await processInput(
-        'us ko udhaar do 5000',
+        'add credit 5000',
         context,
         data,
         'en',
@@ -126,10 +125,10 @@ describe('orchestrator', () => {
       const context = createEmptyContext()
       const data = makeSnapshot([ahmed])
 
-      const { updatedContext: ctx1 } = await processInput('salam', context, data, 'en', true)
+      const { updatedContext: ctx1 } = await processInput('hello', context, data, 'en', true)
       expect(ctx1.turns).toHaveLength(2) // user + ai
 
-      const { updatedContext: ctx2 } = await processInput('Ahmed ka balance', ctx1, data, 'en', true)
+      const { updatedContext: ctx2 } = await processInput('Ahmed balance', ctx1, data, 'en', true)
       expect(ctx2.turns).toHaveLength(4) // 2 more turns
     })
 
