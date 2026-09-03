@@ -90,6 +90,11 @@ type Responses = {
   restorePaymentProposal: (amount: number) => string
   restoreSaleProposal: (amount: number) => string
   customerNotFound: (name: string) => string
+  askCustomerName: () => string
+  askCustomerPhone: (name: string) => string
+  askCustomerAddress: (name: string) => string
+  customerFlowCancelled: () => string
+  reminderProposal: (name: string, amount: number) => string
 }
 
 const en: Responses = {
@@ -156,11 +161,11 @@ const en: Responses = {
   askAmount: () =>
     'How much? Please specify the amount, e.g. "Receive 2000 payment from Ahmed".',
   askCustomer: () => 'Which customer? Please provide the customer name.',
-  proposalLead: () => 'I have prepared this action — please review before confirming:',
+  proposalLead: () => 'Please review this before I change your khata:',
   successPayment: (name, amount, outstanding) =>
-    `Done! ${name}'s payment of ${formatCurrency(amount)} has been recorded. Remaining: ${formatCurrency(outstanding)}.`,
+    `Done! ${name}'s payment of ${formatCurrency(amount)} is in the khata. Remaining: ${formatCurrency(outstanding)}.`,
   successUdhaar: (name, amount, outstanding) =>
-    `Done! Credit of ${formatCurrency(amount)} recorded for ${name}. Remaining: ${formatCurrency(outstanding)}.`,
+    `Done! Credit of ${formatCurrency(amount)} is recorded for ${name}. Remaining: ${formatCurrency(outstanding)}.`,
   successDeleteUdhaar: (description) => `Done! Credit "${description}" has been deleted.`,
   successDeletePayment: (amount, date) =>
     `Done! Payment of ${formatCurrency(amount)} has been deleted (${formatDate(date)}).`,
@@ -178,12 +183,23 @@ const en: Responses = {
     }
     return 'Trying Cloud AI...'
   },
-  greeting: () => 'Hello! How can I help you today?',
-  help: () => 'I can help with:\n• Customer balance — "Ahmed balance"\n• Record payment — "Receive 2000 payment from Ahmed"\n• Add credit — "Add 5000 credit for Ahmed"\n• Record sale — "Record sale 3000"\n• Create customer — "Add new customer Ahmed"\n• Check overdue — "Overdue customers"\n• Business insights — "Business overview"\n\nType or speak naturally in English or Urdu!',
+  greeting: () =>
+    'Assalam-o-Alaikum! Hello — I am Khata AI, your shop assistant. Ask me a balance, record a payment, or add a customer whenever you are ready.',
+  help: () =>
+    'I am right here with your khata. Try:\n• Customer balance — "Ahmed balance"\n• Record payment — "Receive 2000 payment from Ahmed"\n• Add credit — "Add 5000 credit for Ahmed"\n• Record sale — "Record sale 3000"\n• Create customer — "Add new customer Ahmed"\n• Check overdue — "Overdue customers"\n• Business insights — "Business overview"\n\nSpeak or type in English or Urdu — I will follow your language.',
   pronounUnclear: () => 'I\'m not sure who you are referring to. Please provide the customer name.',
-  newCustomerProposal: (name) => `Create new customer "${name}"?`,
+  newCustomerProposal: (name) => `Shall I add "${name}" as a new customer? Please confirm the details.`,
+  askCustomerName: () =>
+    'Of course. What is the new customer\'s name? You can also say "cancel" to stop.',
+  askCustomerPhone: (name) =>
+    `Got it — ${name}. What is their phone number? Say "skip" if you do not have it.`,
+  askCustomerAddress: (name) =>
+    `Thanks. Any address for ${name}? Say "skip" if you want to finish without one.`,
+  customerFlowCancelled: () => 'No problem — I will not add a customer. How else can I help?',
+  reminderProposal: (name, amount) =>
+    `I can open WhatsApp or SMS with a reminder for ${name} (${formatCurrency(amount)} outstanding). Please preview the message and confirm.`,
   saleProposal: (name, amount) => `Record a sale of ${formatCurrency(amount)}${name ? ` for ${name}` : ''}?`,
-  successCreateCustomer: (name) => `Done! Customer "${name}" has been created.`,
+  successCreateCustomer: (name) => `Done! "${name}" is now in your customer list. I can record udhaar or a payment whenever you like.`,
   successSale: (name, amount) => `Done! Sale of ${formatCurrency(amount)} recorded${name ? ` for ${name}` : ''}.`,
   successDeleteSale: (amount, date) =>
     `Done! Sale of ${formatCurrency(amount)} has been deleted (${formatDate(date)}).`,
@@ -301,10 +317,20 @@ const ur: Responses = {
     }
     return 'کلاؤڈ AI سے پوچھتا ہوں...'
   },
-  greeting: () => 'وعلیکم السلام! میں آپ کے خاتے میں آج آپ کی کیا مدد کر سکتا ہوں؟',
-  help: () => 'میں ان چیزوں میں مدد کر سکتا ہوں:\n• گاہک کا بیلنس دیکھیں — "احمد کا بیلنس بتاؤ"\n• ادائیگی ریکارڈ کریں — "احمد کی 2000 ادائیگی وصول کر لو"\n• ادھار شامل کریں — "احمد کو 5000 ادھار دو"\n• فروخت ریکارڈ کریں — "آج کی فروخت لکھو"\n• نیا گاہک بنائیں — "نیا گاہک شامل کرو"\n• تاخیر شدہ دیکھیں — "کس کا ادھار تاخیر شدہ ہے؟"\n• کاروباری جائزہ — "کاروبار کیسا چل رہا ہے؟"\n\nبس انگریزی یا اردو میں قدرتی طور پر ٹائپ یا بولیں!',
+  greeting: () =>
+    'وعلیکم السلام! میں خاتہ AI ہوں، آپ کے دکان کا معاون۔ بیلنس پوچھیں، ادائیگی لکھیں، یا نیا گاہک شامل کریں — میں حاضر ہوں۔',
+  help: () =>
+    'میں آپ کے خاتے کے ساتھ ہوں۔ مثلاً:\n• گاہک کا بیلنس دیکھیں — "احمد کا بیلنس بتاؤ"\n• ادائیگی ریکارڈ کریں — "احمد کی 2000 ادائیگی وصول کر لو"\n• ادھار شامل کریں — "احمد کو 5000 ادھار دو"\n• فروخت ریکارڈ کریں — "آج کی فروخت لکھو"\n• نیا گاہک بنائیں — "نیا گاہک شامل کرو"\n• تاخیر شدہ دیکھیں — "کس کا ادھار تاخیر شدہ ہے؟"\n• کاروباری جائزہ — "کاروبار کیسا چل رہا ہے؟"\n\nانگریزی یا اردو میں ٹائپ یا بولیں — میں آپ کی زبان اپناؤں گی۔',
   pronounUnclear: () => 'مجھے یقین نہیں کہ آپ کس کا حوالہ دے رہے ہیں۔ براہ کرم گاہک کا نام بتائیں۔',
-  newCustomerProposal: (name) => `میں "${name}" نام کا نیا گاہک بناؤں گا۔ کیا میں آگے بڑھوں؟`,
+  newCustomerProposal: (name) => `کیا میں "${name}" کو نیا گاہک بناؤں؟ براہ کرم تفصیل دیکھ کر تصدیق کریں۔`,
+  askCustomerName: () => 'ضرور۔ نئے گاہک کا نام کیا ہے؟ روکنے کے لیے "منسوخ" کہہ سکتے ہیں۔',
+  askCustomerPhone: (name) =>
+    `ٹھیک ہے — ${name}۔ ان کا فون نمبر کیا ہے؟ اگر نہیں ہے تو "چھوڑو" کہہ دیں۔`,
+  askCustomerAddress: (name) =>
+    `شکریہ۔ ${name} کا پتہ بتائیں؟ نہیں چاہیے تو "چھوڑو" کہہ دیں۔`,
+  customerFlowCancelled: () => 'کوئی بات نہیں — گاہک نہیں بنایا۔ اور کیا مدد چاہیے؟',
+  reminderProposal: (name, amount) =>
+    `${name} کے لیے ${formatCurrency(amount)} بقایا کی یاد دہانی واٹس ایپ یا ایس ایم ایس میں کھول سکتی ہوں۔ پیغام دیکھ کر تصدیق کریں۔`,
   saleProposal: (name, amount) => `${name ? `${name} کے لیے` : ''} ${formatCurrency(amount)} کی فروخت ریکارڈ کروں؟`,
   successCreateCustomer: (name) => `مکمل! گاہک "${name}" بن گیا ہے۔`,
   successSale: (name, amount) => `مکمل! ${formatCurrency(amount)} کی فروخت ریکارڈ ہو گئی${name ? ` برائے ${name}` : ''}۔`,

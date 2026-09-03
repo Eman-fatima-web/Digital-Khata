@@ -1,5 +1,5 @@
 import { Worker, type Job } from 'bullmq'
-import { getRedisUrl } from '../services/redis'
+import { getRedisUrl } from '../services/redis.js'
 import { createChildLogger } from '../services/logger.js'
 import { applyAction, type SyncActionPayload } from '../services/sync/applySyncActions.js'
 

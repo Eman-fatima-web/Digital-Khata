@@ -1,6 +1,6 @@
 import { Queue, type JobsOptions } from 'bullmq';
-import { getRedisUrl } from '../services/redis';
-import { createChildLogger } from '../services/logger';
+import { getRedisUrl } from '../services/redis.js';
+import { createChildLogger } from '../services/logger.js';
 
 const log = createChildLogger({ module: 'queues' });
 

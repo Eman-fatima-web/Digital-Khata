@@ -58,6 +58,12 @@ export type ConversationContext = {
   }
   dateContext?: string // ISO date for "today", "yesterday", etc.
   lastReportType?: string // 'daily' | 'weekly' | 'monthly'
+  pendingCustomerCreation?: {
+    step: 'awaiting_name' | 'awaiting_phone' | 'awaiting_address'
+    name?: string
+    phone?: string
+    address?: string
+  }
 }
 
 export type AIRequest = {

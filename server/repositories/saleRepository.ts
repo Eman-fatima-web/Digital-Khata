@@ -1,6 +1,5 @@
 import { query } from '../database/index.js'
-import type { Sale } from '../../src/core/types/index.js'
-import type { SyncStatus } from '../../src/core/config/constants.js'
+import type { Sale, SyncStatus } from '../types/entities.js'
 
 export async function recordSale(
   businessId: string,

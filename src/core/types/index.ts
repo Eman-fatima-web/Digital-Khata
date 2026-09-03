@@ -136,6 +136,9 @@ export type ActionProposal = {
   customerId?: string
   customerName?: string
   customerPhone?: string
+  customerAddress?: string
+  reminderChannel?: 'whatsapp' | 'sms'
+  reminderMessage?: string
   amount?: number
   method?: Payment['method']
   description?: string

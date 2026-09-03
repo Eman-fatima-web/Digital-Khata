@@ -184,8 +184,9 @@ export function runEngine(
         customerName: customer.name,
         customerPhone: customer.phone,
         amount: outstanding,
+        reminderChannel: 'whatsapp',
       }
-      return { type: 'proposal', text: r.proposalLead(), proposal }
+      return { type: 'proposal', text: r.reminderProposal(customer.name, outstanding), proposal }
     }
 
     case 'OVERDUE_CUSTOMERS': {

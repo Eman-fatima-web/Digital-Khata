@@ -3,7 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
-import pinoHttp from 'pino-http'
+import { pinoHttp } from 'pino-http'
 import { logger } from './services/logger.js'
 import { aiRouter } from './routes/ai.js'
 import { authRouter } from './routes/auth.js'
@@ -53,15 +53,15 @@ const authLimiter = rateLimit({
 })
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-app.get('/health/live', (req, res) => {
+app.get('/health/live', (_req, res) => {
   res.json({ status: 'alive', timestamp: new Date().toISOString() })
 })
 
-app.get('/health/ready', async (req, res) => {
+app.get('/health/ready', async (_req, res) => {
   const timestamp = new Date().toISOString()
   const checks: Record<string, { status: 'healthy' | 'degraded' | 'unavailable'; detail?: string }> = {}
 

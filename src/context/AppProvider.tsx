@@ -40,7 +40,7 @@ function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'light'
   const stored = localStorage.getItem(STORAGE_KEYS.THEME) as Theme | null
   if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
-  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark'
+  // Default to light mode as per requirements
   return 'light'
 }
 

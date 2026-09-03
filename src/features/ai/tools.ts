@@ -131,10 +131,15 @@ export async function aiCreateCustomer(
   name: string,
   phone: string | undefined,
   owner: Owner,
+  address?: string,
 ): Promise<ToolResult<Customer>> {
   try {
-    const customer = await addCustomer({ name, phone: phone ?? '' }, owner)
-    return { ok: true, data: customer }
+    const customer = await addCustomer(
+      { name, phone: phone ?? '', address: address || undefined },
+      owner,
+    )
+    const safeCustomer = customer
+    return { ok: true, data: safeCustomer as Customer }
   } catch (error) {
     return { ok: false, error: 'repo-error', message: `Failed to create customer: ${error}` }
   }
@@ -281,7 +286,8 @@ export async function aiUpdateCustomer(
     await updateCustomer(customerId, changes)
     const updated = await getCustomerById(customerId)
     if (!updated) return { ok: false, error: 'not-found', message: 'Customer not found after update' }
-    return { ok: true, data: updated }
+    const safeCustomer = updated
+    return { ok: true, data: safeCustomer as Customer }
   } catch (error) {
     return { ok: false, error: 'repo-error', message: `Failed to update customer: ${error}` }
   }
@@ -315,6 +321,7 @@ export function aiGetBalance(
   customerId: string,
   udhaar: UdhaarEntry[],
 ): { outstanding: number; total: number; paid: number; entries: UdhaarEntry[] } {
+  // CRITICAL: Only include non-deleted udhaar entries
   const customerUdhaar = udhaar.filter((e) => e.customerId === customerId && !e.isDeleted)
   const outstanding = customerUdhaar.reduce((sum, e) => sum + Math.max(0, e.remainingAmount), 0)
   const total = customerUdhaar.reduce((sum, e) => sum + e.amount, 0)
@@ -348,10 +355,12 @@ export function aiGetHistory(
 }
 
 export async function aiGetCustomerById(id: string): Promise<Customer | undefined> {
+  // Customer records carry no sensitive CNIC data, so the record is returned as-is.
   return getCustomerById(id)
 }
 
 export async function aiSearchCustomers(query: string): Promise<Customer[]> {
+  // Customer records carry no sensitive CNIC data, so records are returned as-is.
   return searchCustomers(query)
 }
 

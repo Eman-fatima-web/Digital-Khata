@@ -30,7 +30,7 @@ type AuthState = {
 
 type AuthContextValue = AuthState & {
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, fullName?: string, phone?: string, businessName?: string) => Promise<void>
+  register: (email: string, password: string, fullName?: string, phone?: string, address?: string, cnic?: string, businessName?: string) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
   sendVerification: () => Promise<void>
@@ -62,10 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const register = useCallback(async (email: string, password: string, fullName?: string, phone?: string, businessName?: string) => {
+  const register = useCallback(async (email: string, password: string, fullName?: string, phone?: string, address?: string, cnic?: string, businessName?: string) => {
     setState((prev) => ({ ...prev, isLoading: true }))
     try {
-      const tokens = await apiRegister(email, password, fullName, phone, businessName)
+      const tokens = await apiRegister(email, password, fullName, phone, address, cnic, businessName)
       setState({ user: tokens.user, token: tokens.token, isLoading: false })
     } catch (error) {
       setState((prev) => ({ ...prev, isLoading: false }))

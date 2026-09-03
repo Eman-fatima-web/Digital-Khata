@@ -3,8 +3,6 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     globals: true,
-    include: [
-  "server/tests/**/*.test.ts"
-]
+    include: ['server/**/*.test.ts'],
   },
 })

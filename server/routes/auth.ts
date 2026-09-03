@@ -141,7 +141,7 @@ authRouter.post('/login', async (req, res) => {
  */
 authRouter.post('/register', async (req, res) => {
   try {
-    const { email, password, businessName, fullName, phone } = req.body
+    const { email, password, businessName, fullName, phone, address, cnic } = req.body
 
     // Server-side validation (never trust the client)
     if (typeof email !== 'string' || !email.trim()) {
@@ -157,6 +157,11 @@ authRouter.post('/register', async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       return res.status(400).json({ error: 'Please provide a valid email address' })
+    }
+
+    // CNIC validation if provided
+    if (cnic && !/^\d{5}-\d{7}-\d{1}$/.test(cnic)) {
+      return res.status(400).json({ error: 'CNIC must be in format: XXXXX-XXXXXXX-X' })
     }
 
     const useDb = await isDatabaseAvailable()
@@ -184,10 +189,10 @@ authRouter.post('/register', async (req, res) => {
         const businessId = businessResult.rows[0].id
 
         const userResult = await client.query(
-          `INSERT INTO users (email, password_hash, business_id, full_name, phone)
-           VALUES ($1, $2, $3, $4, $5)
+          `INSERT INTO users (email, password_hash, business_id, full_name, phone, address, cnic)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING id`,
-          [normalizedEmail, passwordHash, businessId, fullName?.trim() || null, phone?.trim() || null]
+          [normalizedEmail, passwordHash, businessId, fullName?.trim() || null, phone?.trim() || null, address?.trim() || null, cnic?.trim() || null]
         )
         const userId = userResult.rows[0].id
 
@@ -210,6 +215,8 @@ authRouter.post('/register', async (req, res) => {
             email: normalizedEmail,
             fullName: fullName?.trim() || null,
             phone: phone?.trim() || null,
+            address: address?.trim() || null,
+            cnic: cnic?.trim() || null,
             shopName: businessName?.trim() || null,
             emailVerified: false,
           },
@@ -236,6 +243,8 @@ authRouter.post('/register', async (req, res) => {
           email: user.email,
           fullName: user.fullName ?? null,
           phone: user.phone ?? null,
+          address: address?.trim() || null,
+          cnic: cnic?.trim() || null,
           shopName: businessName?.trim() || null,
           emailVerified: false,
         },

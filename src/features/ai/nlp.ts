@@ -368,3 +368,25 @@ export function splitCompoundInput(input: string): string[] {
   const parts = input.split(SPLIT_PATTERN).map((part) => part.trim()).filter(Boolean)
   return parts.length > 1 ? parts : [input]
 }
+
+/**
+ * Detect the language of the current user message
+ * Returns 'en' for English, 'ur' for Roman Urdu, 'ur-script' for Urdu script
+ */
+export function detectMessageLanguage(input: string): 'en' | 'ur' | 'ur-script' {
+  if (!input || input.trim().length === 0) return 'en'
+  
+  const normalized = normalize(input)
+  
+  // Check for Urdu script characters (range U+0600 to U+06FF)
+  const hasUrduScript = /[\u0600-\u06FF]/.test(input)
+  if (hasUrduScript) return 'ur-script'
+  
+  // Check for Roman Urdu indicators
+  const romanUrduIndicators = /\b(آج|آہ|کی|کو|ہے|ہیں|میں|نہیں|کیا|کے|اور|پر|سے|سے|ہاں|بھائی|بناؤ|شامل|دیا|دیتا|دیا|رہا|رہی|ہوں|ہیں|گی|گا|گی|کرو|کر|جائیں|آؤ|جاؤ|شکریہ|مہربانی|بارہ)\b/i
+  
+  if (romanUrduIndicators.test(normalized)) return 'ur'
+  
+  // Default to English
+  return 'en'
+}

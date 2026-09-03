@@ -1,7 +1,13 @@
 import type { AILanguage, AIResult, ConversationContext, KhataSnapshot } from './types'
 import { runEngine } from './engine'
-import { detectPronoun, splitCompoundInput } from './nlp'
+import { detectPronoun, splitCompoundInput, detectMessageLanguage } from './nlp'
+import { detectIntent } from './intents'
 import { askAI } from './adapters'
+import {
+  continueCustomerCreation,
+  shouldAbandonCustomerFlow,
+  startCustomerCreation,
+} from './customerCreationFlow'
 
 export function createEmptyContext(): ConversationContext {
   return { turns: [], dateContext: new Date().toISOString().split('T')[0] }
@@ -11,9 +17,36 @@ export async function processInput(
   input: string,
   context: ConversationContext,
   data: KhataSnapshot,
-  language: AILanguage,
+  _language: AILanguage,
   isOnline: boolean,
 ): Promise<{ result: AIResult; updatedContext: ConversationContext }> {
+  // Detect language from current message for dynamic response
+  const detectedLanguage = detectMessageLanguage(input) as AILanguage
+  const intent = detectIntent(input)
+
+  if (context.pendingCustomerCreation && !shouldAbandonCustomerFlow(input)) {
+    const { result, pending } = continueCustomerCreation(
+      input,
+      context.pendingCustomerCreation,
+      detectedLanguage,
+      data.customers,
+    )
+    const updatedContext = {
+      ...updateContext(context, input, result, data),
+      pendingCustomerCreation: pending,
+    }
+    return { result, updatedContext }
+  }
+
+  if (intent === 'CREATE_CUSTOMER') {
+    const { result, pending } = startCustomerCreation(input, detectedLanguage, data.customers)
+    const updatedContext = {
+      ...updateContext(context, input, result, data),
+      pendingCustomerCreation: pending,
+    }
+    return { result, updatedContext }
+  }
+
   // Pronoun resolution: if the input contains pronouns and we have an active customer,
   // inject the customer name so the engine can match it
   let resolvedCustomerName: string | undefined
@@ -21,15 +54,15 @@ export async function processInput(
     resolvedCustomerName = context.activeCustomerName ?? context.lastCustomerName
   }
 
-  // Run the local engine first with pronoun resolution
-  let result = runEngine(input, data, language, resolvedCustomerName)
+  // Run the local engine first with pronoun resolution and detected language
+  let result = runEngine(input, data, detectedLanguage, resolvedCustomerName)
 
   // Active-customer fallback: if the engine needs a customer and we have an active
   // one from context, retry with that customer name injected
   if (result.type === 'clarification' && !resolvedCustomerName) {
     const activeName = context.activeCustomerName ?? context.lastCustomerName
     if (activeName) {
-      const retry = runEngine(input, data, language, activeName)
+      const retry = runEngine(input, data, detectedLanguage, activeName)
       if (retry.type !== 'clarification') {
         result = retry
         resolvedCustomerName = activeName
@@ -44,13 +77,13 @@ export async function processInput(
     if (parts.length > 1) {
       const subResults: AIResult[] = []
       for (const part of parts) {
-        const subResult = runEngine(part, data, language, resolvedCustomerName)
+        const subResult = runEngine(part, data, detectedLanguage, resolvedCustomerName)
         if (subResult.type !== 'fallback') subResults.push(subResult)
       }
       if (subResults.length >= 2) {
         const first = subResults[0]
         if (first.type !== 'fallback') {
-          const secondaryText = language === 'ur'
+          const secondaryText = detectedLanguage === 'ur'
             ? '\n\nبراہ کرم دوسرا عمل الگ سے کہیں۔'
             : '\n\nPlease ask the second action separately.'
           result = { ...first, text: first.text + secondaryText }
@@ -61,16 +94,18 @@ export async function processInput(
     }
   }
 
-  // If still fallback, try cloud AI
+  // If still fallback, try cloud AI with detected language
   if (result.type === 'fallback') {
     result = await askAI(
-      { input, data, language, context },
+      { input, data, language: detectedLanguage, context },
       isOnline,
     )
   }
 
-  // Update context based on the result
-  const updatedContext = updateContext(context, input, result, data)
+  const updatedContext = {
+    ...updateContext(context, input, result, data),
+    pendingCustomerCreation: undefined,
+  }
 
   return { result, updatedContext }
 }

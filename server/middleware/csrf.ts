@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 
 const CSRF_HEADER = 'x-csrf-token'
-const CSRF_SECRET = process.env.CSRF_SECRET || 'digital-khata-csrf-secret-2024'
 
 if (!process.env.CSRF_SECRET && process.env.NODE_ENV === 'production') {
   throw new Error('CSRF_SECRET is required in production')
@@ -55,7 +54,7 @@ export function validateCsrfToken(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export function csrfTokenEndpoint(req: Request, res: Response): void {
+export function csrfTokenEndpoint(_req: Request, res: Response): void {
   const token = generateCsrfToken()
   res.json({ csrfToken: token })
 }

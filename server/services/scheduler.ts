@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 import { createChildLogger } from './logger.js'
 import { isRedisConfigured } from './redis.js'
-import { enqueueJob } from '../queues/index'
+import { enqueueJob } from '../queues/index.js'
 
 const log = createChildLogger({ module: 'scheduler' })
 

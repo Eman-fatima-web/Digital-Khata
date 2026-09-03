@@ -1,6 +1,5 @@
 import { query } from '../database/index.js'
-import type { Payment } from '../../src/core/types/index.js'
-import type { SyncStatus, PaymentMethod } from '../../src/core/config/constants.js'
+import type { Payment, SyncStatus, PaymentMethod } from '../types/entities.js'
 
 export async function recordPayment(
   businessId: string,

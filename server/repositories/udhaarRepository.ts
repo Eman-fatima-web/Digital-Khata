@@ -1,6 +1,5 @@
 import { query } from '../database/index.js'
-import type { UdhaarEntry } from '../../src/core/types/index.js'
-import type { SyncStatus } from '../../src/core/config/constants.js'
+import type { UdhaarEntry, SyncStatus } from '../types/entities.js'
 
 export async function addUdhaar(
   businessId: string,

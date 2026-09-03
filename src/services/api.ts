@@ -93,6 +93,8 @@ export async function register(
   password: string,
   fullName?: string,
   phone?: string,
+  address?: string,
+  cnic?: string,
   businessName?: string,
 ): Promise<AuthTokens> {
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
@@ -100,7 +102,7 @@ export async function register(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password, fullName, phone, businessName }),
+    body: JSON.stringify({ email, password, fullName, phone, address, cnic, businessName }),
   })
 
   if (!response.ok) {

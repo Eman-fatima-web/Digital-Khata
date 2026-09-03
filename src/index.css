@@ -99,11 +99,13 @@
 
   body {
     @apply bg-surface text-ink antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: "tnum";
   }
 
   [dir="rtl"] {
     direction: rtl;
+    font-family: 'Noto Sans Arabic', 'Inter', system-ui, sans-serif;
   }
 }
 

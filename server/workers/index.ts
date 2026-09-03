@@ -1,6 +1,6 @@
 import type { Worker } from 'bullmq'
 import { createChildLogger } from '../services/logger.js'
-import { isRedisConfigured } from '../services/redis'
+import { isRedisConfigured } from '../services/redis.js'
 import { createEmailWorker } from './emailWorker.js'
 import { createMessagingWorker } from './messagingWorker.js'
 import { createSyncWorker } from './syncWorker.js'
@@ -9,7 +9,6 @@ const log = createChildLogger({ module: 'worker-manager' })
 
 let workers: Worker[] = []
 let started = false
-let signalsBound = false
 /**
  * Central worker lifecycle. Called ONCE from server/index.ts so duplicate
  * worker instances are never created by multiple application modules.
@@ -77,5 +76,4 @@ export function getWorkerStatus(): {
 export function resetWorkerManagerForTests(): void {
   workers = []
   started = false
-  signalsBound = false
 }

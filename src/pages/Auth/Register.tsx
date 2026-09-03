@@ -14,6 +14,8 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [cnic, setCnic] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [registered, setRegistered] = useState(false)
@@ -34,13 +36,19 @@ export default function Register() {
       return
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
+    // Basic CNIC validation if provided
+    if (cnic && !/^\d{5}-\d{7}-\d{1}$/.test(cnic)) {
+      setError('CNIC must be in format: XXXXX-XXXXXXX-X')
       return
     }
 
     try {
-      await register(email, password, fullName, phone || undefined, businessName || undefined)
+      await register(email, password, fullName, phone || undefined, address || undefined, cnic || undefined, businessName || undefined)
       try {
         await sendVerification()
       } catch {
@@ -173,6 +181,36 @@ export default function Register() {
                 className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                 placeholder="03XX XXXXXXX"
                 autoComplete="tel"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="address" className="text-sm font-medium text-ink">
+                Address <span className="text-ink-muted">(optional)</span>
+              </label>
+              <input
+                id="address"
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                placeholder="Your address"
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="cnic" className="text-sm font-medium text-ink">
+                CNIC <span className="text-ink-muted">(optional)</span>
+              </label>
+              <input
+                id="cnic"
+                type="text"
+                value={cnic}
+                onChange={(e) => setCnic(e.target.value)}
+                className="w-full rounded-lg border border-surface-hairline bg-surface px-3 py-2 text-ink focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                placeholder="XXXXX-XXXXXXX-X"
                 disabled={isLoading}
               />
             </div>

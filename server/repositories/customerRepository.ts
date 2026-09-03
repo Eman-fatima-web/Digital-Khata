@@ -1,6 +1,5 @@
 import { query } from '../database/index.js'
-import type { Customer } from '../../src/core/types/index.js'
-import type { SyncStatus } from '../../src/core/config/constants.js'
+import type { Customer, SyncStatus } from '../types/entities.js'
 
 export async function createCustomer(
   businessId: string,

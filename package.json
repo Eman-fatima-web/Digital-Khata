@@ -5,14 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server:dev": "npm run dev --prefix server",
+    "server:build": "npm run build --prefix server",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "preview": "vite preview",
-    "build:server": "tsc -p server/tsconfig.json",
-    "test:watch": "vitest",
-    "start:server": "node server/dist/index.js",
-    "dev:server": "tsx watch server/index.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -56,4 +54,3 @@
     "vitest": "^4.1.11"
   }
 }
-
