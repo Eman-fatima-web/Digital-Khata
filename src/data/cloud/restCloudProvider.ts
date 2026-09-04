@@ -7,7 +7,15 @@ import type {
   SyncResult,
 } from './CloudProvider'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined
+// Resolve the backend base URL:
+//  - When VITE_API_BASE_URL is set (e.g. production pointing to a separate
+//    backend host), use it verbatim.
+//  - When unset, default to same-origin → requests go to '/api/...'.
+//    In dev, Vite's proxy (vite.config.ts) forwards '/api' to the backend on
+//    port 3001. This mirrors src/services/api.ts so the cloud provider and the
+//    API client always target the same backend.
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined ?? '').trim()
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '')
 
 export class RestCloudProvider implements CloudProvider {
   name = 'rest'
@@ -23,11 +31,8 @@ export class RestCloudProvider implements CloudProvider {
     const token = this.getToken()
     if (!token) return { success: false, error: 'Not authenticated' }
 
-    const base = this.getBaseUrl()
-    if (!base) return { success: false, error: 'No cloud API configured' }
-
     try {
-      const response = await fetch(`${base}/api/sync/push`, {
+      const response = await fetch(`${this.getBaseUrl()}/api/sync/push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,11 +63,8 @@ export class RestCloudProvider implements CloudProvider {
     const token = this.getToken()
     if (!token) return { records: [], error: 'Not authenticated' }
 
-    const base = this.getBaseUrl()
-    if (!base) return { records: [], error: 'No cloud API configured' }
-
     try {
-      const url = new URL(`${base}/api/sync/pull`)
+      const url = new URL(`${this.getBaseUrl()}/api/sync/pull`)
       if (since) url.searchParams.set('since', since)
 
       const response = await fetch(url.toString(), {
@@ -91,8 +93,13 @@ export class RestCloudProvider implements CloudProvider {
     return tokens?.token
   }
 
-  private getBaseUrl(): string | undefined {
-    return API_BASE_URL || (typeof window !== 'undefined' ? undefined : undefined)
+  private getBaseUrl(): string {
+    // Empty string means same-origin. Return window.location.origin so URL
+    // construction (`new URL(...)`) works for relative '/api/...' paths —
+    // this is exactly the Vite-proxy case in dev and the deployed backend in
+    // production when VITE_API_BASE_URL is intentionally unset.
+    if (API_BASE_URL) return API_BASE_URL
+    return typeof window !== 'undefined' ? window.location.origin : ''
   }
 }
 

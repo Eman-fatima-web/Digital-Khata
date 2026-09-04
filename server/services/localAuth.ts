@@ -51,7 +51,8 @@ function saveStore(store: LocalAuthStore): void {
 
 export function findUserByEmail(email: string): LocalUser | undefined {
   const store = loadStore()
-  return store.users.find((u) => u.email === email)
+  const normalized = email.trim().toLowerCase()
+  return store.users.find((u) => u.email.trim().toLowerCase() === normalized)
 }
 
 export async function createUser(

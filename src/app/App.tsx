@@ -25,6 +25,7 @@ const Notifications = lazy(() => import('../pages/Notifications/Notifications'))
 const Conflicts = lazy(() => import('../pages/Conflicts/Conflicts'))
 const Trash = lazy(() => import('../pages/Trash/Trash'))
 const Settings = lazy(() => import('../pages/Settings/Settings'))
+const Profile = lazy(() => import('../pages/Profile/Profile'))
 const AuditLog = lazy(() => import('../pages/AuditLog/AuditLog'))
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/conflicts" element={<Conflicts />} />
           <Route path="/trash" element={<Trash />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
         </Route>

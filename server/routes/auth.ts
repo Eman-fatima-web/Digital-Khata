@@ -64,18 +64,19 @@ authRouter.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
 
-    if (!email || !password) {
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Email and password required' })
     }
 
+    const normalizedEmail = email.trim().toLowerCase()
     const useDb = await isDatabaseAvailable()
 
     if (useDb) {
       const result = await query(
         `SELECT u.*, b.id as business_id FROM users u 
          JOIN businesses b ON u.business_id = b.id 
-         WHERE u.email = $1`,
-        [email]
+         WHERE LOWER(TRIM(u.email)) = $1`,
+        [normalizedEmail]
       )
 
       if (result.rows.length === 0) {
@@ -104,7 +105,7 @@ authRouter.post('/login', async (req, res) => {
         },
       })
     } else {
-      const user = findUserByEmail(email)
+      const user = findUserByEmail(normalizedEmail)
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' })
       }

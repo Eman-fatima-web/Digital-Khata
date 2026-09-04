@@ -138,7 +138,6 @@ function toProposal(
 export function startCustomerCreation(
   input: string,
   language: AILanguage,
-  customers: Customer[],
 ): { result: AIResult; pending?: PendingCustomerCreation } {
   const r = getResponses(language)
   const detected = detectNewCustomer(input)

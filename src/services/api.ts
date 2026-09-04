@@ -3,7 +3,17 @@
  * Handles authentication, request formatting, and error handling.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+// Resolve the backend base URL:
+//  - When VITE_API_BASE_URL is set (e.g. production pointing to a separate
+//    backend host), use it verbatim.
+//  - When unset, default to same-origin → all requests go to '/api/...'.
+//    In dev, Vite's proxy (vite.config.ts) forwards '/api' to the backend on
+//    port 3001. This is the critical fix for "Failed to fetch": the old
+//    client-side fallback 'http://localhost:3001' bypassed the proxy and only
+//    worked on the machine running the backend, breaking login from any other
+//    device (phone/tablet) on the LAN and in deployed environments.
+const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined ?? '').trim()
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '')
 
 type AuthTokens = {
   token: string
@@ -63,11 +73,25 @@ export function isAuthenticated(): boolean {
   return loadAuthTokens() !== null
 }
 
+async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch (err) {
+    if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('NetworkError'))) {
+      throw new Error(
+        'Unable to connect to Digital Khata server. Please ensure the backend server is reachable.',
+        { cause: err },
+      )
+    }
+    throw err
+  }
+}
+
 /**
  * Login to the backend
  */
 export async function login(email: string, password: string): Promise<AuthTokens> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  const response = await safeFetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -76,7 +100,7 @@ export async function login(email: string, password: string): Promise<AuthTokens
   })
 
   if (!response.ok) {
-    const error = await response.json()
+    const error = await response.json().catch(() => ({ error: 'Login failed' }))
     throw new Error(error.error || 'Login failed')
   }
 
@@ -97,7 +121,7 @@ export async function register(
   cnic?: string,
   businessName?: string,
 ): Promise<AuthTokens> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+  const response = await safeFetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -106,7 +130,7 @@ export async function register(
   })
 
   if (!response.ok) {
-    const error = await response.json()
+    const error = await response.json().catch(() => ({ error: 'Registration failed' }))
     throw new Error(error.error || 'Registration failed')
   }
 
@@ -134,7 +158,7 @@ async function authenticatedRequest<T>(
     throw new Error('Not authenticated')
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await safeFetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -148,7 +172,7 @@ async function authenticatedRequest<T>(
       clearAuthTokens()
       throw new Error('Authentication expired')
     }
-    const error = await response.json()
+    const error = await response.json().catch(() => ({ error: 'Request failed' }))
     throw new Error(error.error || error.message || 'Request failed')
   }
 
@@ -242,10 +266,10 @@ export async function verifyEmail(
   token: string,
   userId: string
 ): Promise<{ verified: boolean; error?: string }> {
-  const response = await fetch(
+  const response = await safeFetch(
     `${API_BASE_URL}/api/auth/verify-email?token=${encodeURIComponent(token)}&id=${encodeURIComponent(userId)}`
   )
-  return response.json()
+  return response.json().catch(() => ({ verified: false, error: 'Verification request failed' }))
 }
 
 /**
@@ -291,12 +315,12 @@ export async function changePassword(
  * Request a password reset email
  */
 export async function forgotPassword(email: string): Promise<{ sent: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+  const response = await safeFetch(`${API_BASE_URL}/api/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   })
-  return response.json()
+  return response.json().catch(() => ({ sent: false }))
 }
 
 /**
@@ -307,12 +331,12 @@ export async function resetPassword(
   userId: string,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+  const response = await safeFetch(`${API_BASE_URL}/api/auth/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, id: userId, password }),
   })
-  return response.json()
+  return response.json().catch(() => ({ success: false, error: 'Password reset request failed' }))
 }
 
 /**

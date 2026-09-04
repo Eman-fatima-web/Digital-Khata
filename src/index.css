@@ -43,6 +43,7 @@
   --color-surface: #F8FAF7;
   --color-surface-card: #FFFFFF;
   --color-surface-hover: #EDF2ED;
+  --color-surface-raised: #EDF2ED;
   --color-surface-hairline: #E3EEE7;
   --color-surface-border: #D1DDD5;
 
@@ -54,20 +55,23 @@
 
 [data-theme="dark"] {
   /* Premium dark theme - deep neutral backgrounds, not pure black */
-  --color-ink: #F1F5F9 !important;
-  --color-ink-light: #CBD5E1 !important;
+  --color-ink: #F8FAFC !important;
+  --color-ink-light: #E2E8F0 !important;
   --color-ink-muted: #94A3B8 !important;
-  --color-ink-subtle: #8B9BB5 !important;
+  --color-ink-subtle: #64748B !important;
 
-  --color-surface: #0F172A !important;
+  --color-surface: #0B1120 !important;
   --color-surface-card: #1E293B !important;
-  --color-surface-hover: #283548 !important;
+  --color-surface-hover: #334155 !important;
+  --color-surface-raised: #334155 !important;
   --color-surface-hairline: #334155 !important;
-  --color-surface-border: #334155 !important;
+  --color-surface-border: #475569 !important;
 
-  --color-primary-500: #2DD4BF !important;
-  --color-primary-600: #2DD4BF !important;
-  --color-success-500: #10B981 !important;
+  /* High contrast teal for dark mode buttons with white text */
+  --color-primary-500: #0D9488 !important;
+  --color-primary-600: #0F766E !important;
+  --color-success-500: #059669 !important;
+  --color-success-600: #10B981 !important;
   --color-accent-500: #F59E0B !important;
   --color-danger: #EF4444 !important;
   --color-warning: #F59E0B !important;

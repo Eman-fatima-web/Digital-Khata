@@ -270,6 +270,11 @@ function AI() {
   const contextRef = useRef<ConversationContext>(createEmptyContext())
   const speechIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  // Synchronous guard against duplicate submissions. The `thinking` state is
+  // updated asynchronously, so two rapid Enter presses (or Enter + tap) could
+  // each pass the `if (thinking)` check before React re-renders and disable
+  // the send button. This ref closes that window.
+  const sendingRef = useRef(false)
 
   const handleTextareaKeydown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -409,7 +414,17 @@ function AI() {
 
   const sendText = async (raw: string) => {
     const text = raw.trim()
-    if (!text || thinking) return
+    if (!text || thinking || sendingRef.current) return
+
+    sendingRef.current = true
+    try {
+      await sendTextInner(text)
+    } finally {
+      sendingRef.current = false
+    }
+  }
+
+  const sendTextInner = async (text: string) => {
 
     pushMessage('user', text)
     setThinking(true)

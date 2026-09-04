@@ -39,7 +39,7 @@ export async function processInput(
   }
 
   if (intent === 'CREATE_CUSTOMER') {
-    const { result, pending } = startCustomerCreation(input, detectedLanguage, data.customers)
+    const { result, pending } = startCustomerCreation(input, detectedLanguage)
     const updatedContext = {
       ...updateContext(context, input, result, data),
       pendingCustomerCreation: pending,
