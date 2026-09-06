@@ -1,0 +1,202 @@
+import type { LanguageCode, PaymentMethod, SyncStatus } from '../config/constants'
+
+// Base fields present on every syncable record
+export type Syncable = {
+  id: string
+  userId: string
+  shopId: string
+  createdAt: string
+  updatedAt: string
+  syncStatus: SyncStatus
+  version: number
+  isDeleted?: boolean
+}
+
+export type Customer = Syncable & {
+  name: string
+  phone: string
+  address?: string
+  language?: LanguageCode
+  riskScore?: 'low' | 'medium' | 'high'
+}
+
+export type BillItem = {
+  name: string
+  qty: number
+  rate: number
+  amount: number
+}
+
+export type UdhaarEntry = Syncable & {
+  customerId: string
+  description: string
+  amount: number
+  paidAmount: number
+  remainingAmount: number
+  dueDate?: string
+  items?: BillItem[]
+}
+
+export type Payment = Syncable & {
+  customerId: string
+  udhaarId?: string
+  amount: number
+  method: PaymentMethod
+  date: string
+}
+
+export type Sale = Syncable & {
+  customerId?: string
+  amount: number
+  description: string
+  date: string
+  items?: BillItem[]
+}
+
+export type KhataEntity = Customer | UdhaarEntry | Payment | Sale
+
+export type KhataTable = 'customers' | 'udhaar' | 'payments' | 'sales'
+
+export type SyncAction = {
+  id: string
+  table: KhataTable
+  recordId: string
+  operation: 'create' | 'update' | 'delete'
+  payload: KhataEntity
+  createdAt: string
+  attempts: number
+  error?: string
+}
+
+// A local-only review record. It keeps both versions intact until the owner
+// explicitly chooses one; it is never sent to the cloud as business data.
+export type SyncConflictRecord = {
+  id: string
+  table: KhataTable
+  recordId: string
+  local: KhataEntity
+  remote: KhataEntity
+  createdAt: string
+}
+
+export type User = {
+  id: string
+  email?: string
+  name: string
+  phone?: string
+  emailVerified?: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type Shop = {
+  id: string
+  name: string
+  ownerId: string
+  address?: string
+  phone?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type AppState = {
+  user: User | null
+  shop: Shop | null
+  isOnline: boolean
+  syncState: 'idle' | 'syncing' | 'error'
+  lastSyncAt?: string
+}
+
+export type ActivityItem = {
+  id: string
+  type: 'udhaar' | 'payment' | 'sale'
+  title: string
+  subtitle: string
+  amount: number
+  date: string
+  customerId?: string
+}
+
+export type ActionKind =
+  | 'RECORD_PAYMENT'
+  | 'ADD_UDHAAR'
+  | 'DELETE_UDHAAR'
+  | 'DELETE_PAYMENT'
+  | 'DELETE_SALE'
+  | 'RESTORE_CUSTOMER'
+  | 'RESTORE_UDHAAR'
+  | 'RESTORE_PAYMENT'
+  | 'RESTORE_SALE'
+  | 'UPDATE_CUSTOMER'
+  | 'UPDATE_UDHAAR'
+  | 'UPDATE_PAYMENT'
+  | 'SEND_REMINDER'
+  | 'CREATE_CUSTOMER'
+  | 'RECORD_SALE'
+  | 'NAVIGATE'
+  | 'SET_THEME'
+  | 'SET_LANGUAGE'
+  | 'SET_NOTIFICATION_PREFS'
+
+// Metadata about an AI-proposed action. References entities by id; never a
+// copy of the financial records themselves.
+export type ActionProposal = {
+  kind: ActionKind
+  customerId?: string
+  customerName?: string
+  customerPhone?: string
+  customerAddress?: string
+  reminderChannel?: 'whatsapp' | 'sms'
+  reminderMessage?: string
+  amount?: number
+  method?: Payment['method']
+  description?: string
+  udhaarId?: string
+  udhaarDescription?: string
+  udhaarRemaining?: number
+  paymentId?: string
+  paymentDate?: string
+  saleId?: string
+  saleDate?: string
+  date?: string
+  note?: { en: string; ur: string }
+  // Navigation action
+  path?: string
+  // Settings action
+  setting?: 'theme' | 'language' | 'notifications'
+  settingValue?: string
+  notificationPrefs?: Record<string, boolean>
+}
+
+// Persisted Khata AI chat message. Deliberately carries no sync fields:
+// chat history is local-only and separate from the financial tables.
+export type AIMessage = {
+  id: string
+  userId: string
+  shopId: string
+  conversationId?: string
+  role: 'user' | 'ai'
+  content: string
+  createdAt: string
+  action?: ActionProposal
+  actionState?: 'pending' | 'executing' | 'confirmed' | 'cancelled'
+}
+
+export type Conversation = {
+  id: string
+  userId: string
+  shopId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NotificationPreferences = {
+  dailySalesSummary: boolean
+  weeklySalesSummary: boolean
+  monthlySalesSummary: boolean
+  paymentReminders: boolean
+  whatsappReminders: boolean
+  smsReminders: boolean
+  emailReports: boolean
+}

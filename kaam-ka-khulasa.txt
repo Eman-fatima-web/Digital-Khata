@@ -1,0 +1,23 @@
+================================================================
+DIGITAL KHATA — KAAM KA TAFSEELI KHULASA
+================================================================
+
+1) ITEM-LEVEL BILLING: Udhaar aur Sale mein detailed items (naam, qty, rate, amount). Supabase mein items column migrate, server + frontend dono par.
+
+2) SAVED PRODUCTS + AUTOCOMPLETE: Bill mein naam likhne par saved products se autocomplete aata hai, rate khud bhar jata hai. Har shop ki alag list (localStorage mein).
+
+3) PRODUCTS PAGE: add/edit/delete/search, stock qty, cost price, margin %, low-stock badge, aur total stats (products/stock/investment/value).
+
+4) STOCK TRACKING: Sale record hone par stock khud decrement hota hai, low-stock warning (<=5), stock 0 se neeche nahi jata.
+
+5) PROFIT/LOSS: Cost price se Potential profit (stock value - investment) + Profit from Sales (revenue - COGS) + har item ka margin %.
+
+6) DASHBOARD PROFIT CARD: Sabse upar asli munafa (green) / nuksan (red). Tap par Products page khul jata hai.
+
+7) REPORTS UPGRADE: Top Selling Items card + Items PDF export (ranking qty + revenue ke hisaab se).
+
+8) PDF REPORTS (stylish): Teal banner, page frame, colored accent boxes, green/red margins, har page par table header + footer with page number.
+
+9) VERIFICATION: tsc + eslint clean. 543 tests pass (2 naye PDF runtime tests se ek bug pakda aur fix: setStrokeColor -> setDrawColor). Build theek.
+
+NET RESULT: Products, stock, cost, profit sab stylish PDF mein — pura hisaab aik jagah.

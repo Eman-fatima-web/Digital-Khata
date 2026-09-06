@@ -1,0 +1,276 @@
+import type { AILanguage, AIResult, ConversationContext, ConversationTurn, KhataSnapshot } from './types'
+import { runEngine } from './engine'
+import { detectPronoun, matchCustomers, splitCompoundInput, detectMessageLanguage } from './nlp'
+import { detectIntent } from './intents'
+import { askAI } from './adapters'
+import type { Customer } from '../../core/types'
+import {
+  continueCustomerCreation,
+  shouldAbandonCustomerFlow,
+  startCustomerCreation,
+} from './customerCreationFlow'
+
+export function createEmptyContext(): ConversationContext {
+  return { turns: [], dateContext: new Date().toISOString().split('T')[0] }
+}
+
+/**
+ * Rebuild a ConversationContext from persisted chat history so that opening
+ * an older conversation continues it WITH memory (turns for the cloud AI,
+ * active customer for pronoun resolution, and the last intent for follow-ups).
+ * The last 20 turns are kept, matching what the live session stores.
+ */
+export function buildContextFromHistory(
+  history: Array<{ role: 'user' | 'ai'; content: string }>,
+  customers: Customer[] = [],
+): ConversationContext {
+  const turns = history
+    .slice(-20)
+    .map((row): ConversationTurn => ({
+      role: row.role,
+      input: row.content,
+      timestamp: '',
+    }))
+
+  let lastIntent: string | undefined
+  let activeCustomerId: string | undefined
+  let activeCustomerName: string | undefined
+
+  const lastUserTurn = [...history].reverse().find((row) => row.role === 'user')
+  if (lastUserTurn) {
+    const detected = detectIntent(lastUserTurn.content)
+    if (detected !== 'UNKNOWN') lastIntent = detected
+
+    if (customers.length > 0) {
+      const match = matchCustomers(lastUserTurn.content, customers)
+      if (match.status === 'unique') {
+        activeCustomerId = match.customer.id
+        activeCustomerName = match.customer.name
+      }
+    }
+  }
+
+  return {
+    turns,
+    lastIntent,
+    activeCustomerId,
+    activeCustomerName,
+    dateContext: new Date().toISOString().split('T')[0],
+  }
+}
+
+export async function processInput(
+  input: string,
+  context: ConversationContext,
+  data: KhataSnapshot,
+  _language: AILanguage,
+  isOnline: boolean,
+): Promise<{ result: AIResult; updatedContext: ConversationContext }> {
+  // Choose the reply language by matching the SCRIPT the user actually wrote:
+  // Urdu-script input is answered in Urdu, while Roman Urdu / English input is
+  // answered in the app's UI language — so a user never gets an unexpected
+  // script back for the way they type.
+  const messageLanguage = detectMessageLanguage(input)
+  const detectedLanguage: AILanguage = messageLanguage === 'ur-script' ? 'ur' : _language
+  const intent = detectIntent(input)
+
+  if (context.pendingCustomerCreation && !shouldAbandonCustomerFlow(input)) {
+    const { result, pending } = continueCustomerCreation(
+      input,
+      context.pendingCustomerCreation,
+      detectedLanguage,
+      data.customers,
+    )
+    const updatedContext = {
+      ...updateContext(context, input, result, data),
+      pendingCustomerCreation: pending,
+    }
+    return { result, updatedContext }
+  }
+
+  if (intent === 'CREATE_CUSTOMER') {
+    const { result, pending } = startCustomerCreation(input, detectedLanguage)
+    const updatedContext = {
+      ...updateContext(context, input, result, data),
+      pendingCustomerCreation: pending,
+    }
+    return { result, updatedContext }
+  }
+
+  // Pronoun resolution: if the input contains pronouns and we have an active customer,
+  // inject the customer name so the engine can match it
+  let resolvedCustomerName: string | undefined
+  if (detectPronoun(input) && (context.activeCustomerName ?? context.lastCustomerName)) {
+    resolvedCustomerName = context.activeCustomerName ?? context.lastCustomerName
+  }
+
+  // Run the local engine first with pronoun resolution and detected language
+  let result = runEngine(input, data, detectedLanguage, resolvedCustomerName)
+
+  // In an ongoing conversation a second greeting should not replay the long
+  // onboarding block — reply with a short conversational line instead.
+  if (intent === 'GREETING' && result.type === 'answer' && context.turns.length > 0) {
+    result = {
+      type: 'answer',
+      text:
+        detectedLanguage === 'ur'
+          ? 'وعلیکم السلام! میں حاضر ہوں۔ کیا چاہیے — کسی کا بیلنس، کوئی ادائیگی، یا فروخت کا حساب؟'
+          : 'Hello! I am here. What do you need — a balance, a payment, or a sales summary?',
+    }
+  }
+
+  // Active-customer fallback: if the engine needs a customer and we have an active
+  // one from context, retry with that customer name injected
+  if (result.type === 'clarification' && !resolvedCustomerName) {
+    const activeName = context.activeCustomerName ?? context.lastCustomerName
+    if (activeName) {
+      const retry = runEngine(input, data, detectedLanguage, activeName)
+      if (retry.type !== 'clarification') {
+        result = retry
+        resolvedCustomerName = activeName
+      }
+    }
+  }
+
+  // Compound intent splitting: if the engine returns UNKNOWN, try splitting
+  // the input on conjunctions and process each part independently
+  if (result.type === 'fallback') {
+    const parts = splitCompoundInput(input)
+    if (parts.length > 1) {
+      const subResults: AIResult[] = []
+      for (const part of parts) {
+        const subResult = runEngine(part, data, detectedLanguage, resolvedCustomerName)
+        if (subResult.type !== 'fallback') subResults.push(subResult)
+      }
+      if (subResults.length >= 2) {
+        const first = subResults[0]
+        if (first.type !== 'fallback') {
+          const secondaryText = detectedLanguage === 'ur'
+            ? '\n\nبراہ کرم دوسرا عمل الگ سے کہیں۔'
+            : '\n\nPlease ask the second action separately.'
+          result = { ...first, text: first.text + secondaryText }
+        }
+      } else if (subResults.length === 1) {
+        result = subResults[0]
+      }
+    }
+  }
+
+  // If still fallback, try cloud AI with detected language
+  if (result.type === 'fallback') {
+    result = await askAI(
+      { input, data, language: detectedLanguage, context },
+      isOnline,
+    )
+  }
+
+  const updatedContext = {
+    ...updateContext(context, input, result, data),
+    pendingCustomerCreation: undefined,
+  }
+
+  return { result, updatedContext }
+}
+
+/** Clear pending confirmation (called after confirm/cancel) */
+export function clearPendingConfirmation(context: ConversationContext): ConversationContext {
+  return { ...context, pendingConfirmation: undefined }
+}
+
+function updateContext(
+  context: ConversationContext,
+  input: string,
+  result: AIResult,
+  data: KhataSnapshot,
+): ConversationContext {
+  const now = new Date().toISOString()
+
+  // Add the user turn
+  const userTurn = {
+    role: 'user' as const,
+    input,
+    timestamp: now,
+  }
+
+  // Add the AI turn
+  const aiText = result.type === 'fallback'
+    ? '...'
+    : result.type === 'proposal'
+      ? result.text
+      : result.text
+  const aiTurn = {
+    role: 'ai' as const,
+    input: aiText,
+    timestamp: now,
+  }
+
+  // Determine what customer/amount was involved in this turn
+  let lastCustomerId = context.lastCustomerId
+  let lastCustomerName = context.lastCustomerName
+  let lastAmount = context.lastAmount
+  const lastIntent = context.lastIntent
+  let activeCustomerId = context.activeCustomerId
+  let activeCustomerName = context.activeCustomerName
+  let pendingConfirmation = context.pendingConfirmation
+  let lastReportType = context.lastReportType
+
+  // If the result has a proposal with a customer, update context
+  // But first: if the active customer from context no longer exists in the snapshot
+  // (was deleted), we must clear it to prevent stale financial data references.
+  const activeStillExists = !context.activeCustomerId
+    || data.customers.some((c) => c.id === context.activeCustomerId)
+  if (!activeStillExists) {
+    activeCustomerId = undefined
+    activeCustomerName = undefined
+    lastCustomerId = undefined
+    lastCustomerName = undefined
+  }
+
+  // If the result has a proposal with a customer, update context
+  if (result.type === 'proposal' && result.proposal.customerId) {
+    lastCustomerId = result.proposal.customerId
+    lastCustomerName = result.proposal.customerName
+    lastAmount = result.proposal.amount
+    // Set active customer for follow-up references
+    activeCustomerId = result.proposal.customerId
+    activeCustomerName = result.proposal.customerName
+    // Track pending confirmation for security
+    pendingConfirmation = {
+      proposalKind: result.proposal.kind,
+      customerId: result.proposal.customerId,
+      amount: result.proposal.amount,
+      createdAt: now,
+    }
+  }
+
+  // If the result mentions a customer in the text, update active customer
+  if (result.type === 'answer') {
+    for (const customer of data.customers) {
+      if (result.text.includes(customer.name)) {
+        lastCustomerId = customer.id
+        lastCustomerName = customer.name
+        activeCustomerId = customer.id
+        activeCustomerName = customer.name
+        break
+      }
+    }
+  }
+
+  // Track report type from intent
+  if (lastIntent === 'SALES_SUMMARY' || lastIntent === 'WEEKLY_SALES' || lastIntent === 'MONTHLY_SALES') {
+    lastReportType = lastIntent === 'WEEKLY_SALES' ? 'weekly' : lastIntent === 'MONTHLY_SALES' ? 'monthly' : 'daily'
+  }
+
+  return {
+    turns: [...context.turns, userTurn, aiTurn].slice(-20), // Keep last 20 turns
+    lastCustomerId,
+    lastCustomerName,
+    lastAmount,
+    lastIntent,
+    activeCustomerId,
+    activeCustomerName,
+    pendingConfirmation,
+    dateContext: context.dateContext ?? now.split('T')[0],
+    lastReportType,
+  }
+}

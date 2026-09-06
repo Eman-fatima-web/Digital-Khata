@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0f2f1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="pageGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0fdfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ccfbf1;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad)" />
+
+  <!-- Subtle inner ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+
+  <!-- Book shadow -->
+  <ellipse cx="260" cy="380" rx="120" ry="16" fill="rgba(0,0,0,0.12)"/>
+
+  <!-- Open book - left page -->
+  <path d="M 130 160 Q 130 150 140 148 L 245 135 Q 255 134 256 144 L 256 350 Q 256 358 248 358 L 140 358 Q 130 358 130 348 Z"
+        fill="url(#bookGrad)" filter="url(#shadow)"/>
+
+  <!-- Open book - right page -->
+  <path d="M 382 160 Q 382 150 372 148 L 267 135 Q 257 134 256 144 L 256 350 Q 256 358 264 358 L 372 358 Q 382 358 382 348 Z"
+        fill="url(#pageGrad)" filter="url(#shadow)"/>
+
+  <!-- Book spine -->
+  <line x1="256" y1="134" x2="256" y2="358" stroke="#0d9488" stroke-width="3" opacity="0.4"/>
+
+  <!-- Left page lines (ledger entries) -->
+  <line x1="155" y1="180" x2="235" y2="175" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="155" y1="205" x2="230" y2="200" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="155" y1="230" x2="225" y2="226" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="155" y1="255" x2="232" y2="251" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="155" y1="280" x2="220" y2="277" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Right page lines (ledger entries) -->
+  <line x1="277" y1="175" x2="357" y2="180" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="277" y1="200" x2="352" y2="205" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="277" y1="226" x2="350" y2="230" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="277" y1="251" x2="355" y2="255" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="277" y1="277" x2="345" y2="280" stroke="#99f6e4" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Gold pen/pencil accent -->
+  <g transform="rotate(-30, 370, 140)">
+    <rect x="355" y="90" width="12" height="100" rx="3" fill="url(#goldGrad)"/>
+    <polygon points="355,190 367,190 361,210" fill="#92400e"/>
+    <rect x="355" y="90" width="12" height="15" rx="3" fill="#fbbf24"/>
+  </g>
+
+  <!-- Rupee symbol on left page -->
+  <text x="175" y="325" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#0d9488" opacity="0.6">₨</text>
+
+  <!-- Checkmark on right page -->
+  <path d="M 310 310 L 322 325 L 348 295" fill="none" stroke="#059669" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+</svg>

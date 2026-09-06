@@ -1,0 +1,223 @@
+=============================================================================
+DIGITAL KHATA — COMPLETE PROJECT KNOWLEDGE SUMMARY
+(AI Chatbot Knowledge Base — what the app can do and what the AI can do)
+=============================================================================
+
+WHAT THIS PROJECT IS
+---------------------------------------------------------------------------------
+Digital Khata is a REAL-WORLD, production-grade, offline-first udhaar (credit)
+ledger and business assistant app for Pakistani shopkeepers. It is NOT a demo
+or mock system. It records customers, credit given (udhaar), payments received,
+daily sales, products & stock, and profit — and it works fully OFFLINE.
+
+Real-world stack:
+- Frontend: React + Vite + TypeScript, Tailwind CSS, indexable UI offline-first
+- Local DB: Dexie (IndexedDB) on the device with migrations
+- Cloud DB: PostgreSQL (real connection verified) for sync/accounts
+- Backend: Node + Express server (port 3001), real JWT auth (bcrypt + jsonwebtoken)
+- Background jobs: Redis + BullMQ workers (email, messaging, sync)
+- AI: hybrid 2-layer (local deterministic engine + cloud OpenRouter gpt-4o-mini)
+- Security: helmet/CSP, CSRF, rate limiting, tenant isolation, audit logs, PII redaction
+- Tests: 584 passing tests incl. security/audit suites
+
+---------------------------------------------------------------------------------
+1) APP PAGES & FEATURES (what the app itself does)
+---------------------------------------------------------------------------------
+/dashboard
+   - Today's overview, outstanding udhaar, recent activity, profit cards
+
+/customers  (+ /customers/:id detail page)
+   - Add, edit, delete (soft), restore customers
+   - Fields: Name (required), Phone (optional 03XX XXXXXXX), Address (optional),
+     CNIC, Initial Udhaar (optional: Amount + Description)
+   - Customer detail: full history (udhaar, payments, sales), balance
+
+/udhaar (credit given)
+   - Record credit to a customer
+   - Fields: Customer (required), Description, Credit Amount, Due Date (optional)
+   - Per-entry paid/remaining tracking; delete + restore
+   - 80mm thermal receipt printing
+
+/payments (vussoli / receipts)
+   - Record payments received
+   - Fields: Customer (required), Against Udhaar (optional), Amount,
+     Method (Cash / Bank Transfer / JazzCash / Easypaisa), Date (default today)
+   - Delete + restore
+
+/sales
+   - Record daily sales (optionally with a linked customer; blank = walk-in)
+   - Fields: Customer (optional), Description (required), Amount OR products+qty,
+     Date (default today)
+   - Summaries by day / week / month
+
+/products
+   - Product list: Name, Rate (selling price), Cost price (for profit), Stock
+   - Low-stock warning when stock <= 5; stock drops automatically on a sale
+
+/reports   (+ /reports/received)
+   - Daily / weekly / monthly summaries
+   - Outstanding report, received-payments report, customer report
+   - PDF export for every report
+
+/cashbook
+   - Full cashbook (all money in/out) + PDF export
+
+/reminders
+   - Send payment reminder to a customer via WhatsApp or SMS
+   - Message pre-filled with customer name + due amount; "remind all overdue"
+
+/notifications
+   - Notification preferences: daily/weekly/monthly summaries on/off
+
+/ai
+   - Khata AI chat assistant: type OR speak (microphone), hear replies (voice)
+   - Persists conversation history (IndexedDB), clear-chats option
+
+/trash
+   - Recently deleted items; restore from here
+
+/conflicts
+   - Cloud sync conflict resolution
+
+/profile
+   - User profile, shop name
+
+/settings
+   - Profile, shop name, PIN lock, language (English/Urdu UI), theme (light/dark),
+     notification preferences
+
+/audit-log
+   - Full audit trail of actions (admin)
+
+/admin
+   - Admin dashboard (roles: user / admin / superadmin)
+
+Auth pages: /login, /register, /verify-email, /forgot-password, /reset-password
+
+Extras:
+   - Offline-first: everything works with no internet; syncs to cloud when online
+   - 80mm thermal receipts, PDF reports (cashbook, reports, top items, products & profit)
+   - Bilingual UI (English / Urdu), light & dark theme, optional PIN lock
+   - Data stays on device; cloud sync optional via account
+
+---------------------------------------------------------------------------------
+2) KHATA AI — WHAT THE CHATBOT CAN DO
+---------------------------------------------------------------------------------
+The AI works in ENGLISH and URDU (both Roman Urdu and Urdu script). It can be
+typed or spoken to. It uses a 2-LAYER brain:
+
+   LAYER 1 — Local Offline Engine (instant, no internet, deterministic)
+   LAYER 2 — Cloud AI (OpenRouter gpt-4o-mini) for anything the local engine
+             does not cover (general knowledge, market advice, translations)
+
+A) ACTIONS THE AI CAN PERFORM (it prepares proposals you confirm)
+   - Add new customer            (CREATE_CUSTOMER)
+   - Record a payment            (RECORD_PAYMENT)
+   - Give / add udhaar (credit)  (ADD_UDHAAR)
+   - Record a sale               (RECORD_SALE)
+   - Delete udhaar / payment / sale (with confirmation)
+   - Restore deleted customer / udhaar / payment / sale
+   - Update customer (edit)      (UPDATE_CUSTOMER)
+   - Send a WhatsApp/SMS payment reminder to a customer (SEND_REMINDER)
+   - Send reminders to all overdue customers (SEND_OVERDUE_REMINDERS)
+   - Open/navigate to a page     (NAVIGATE)
+   - Change theme (SET_THEME), language (SET_LANGUAGE), notification prefs
+
+   Pages the AI can OPEN: dashboard, customers, udhaar, payments, sales,
+   reports, reminders, products, settings, ai-assistant.
+
+B) QUESTIONS THE AI ANSWERS (from your own live khata data)
+   - Customer balance            (CUSTOMER_BALANCE)  e.g. "Ahmed ka balance"
+   - Totals / overall summary    (TOTALS)
+   - Sales: today / week / month / yesterday, per customer or overall
+     (SALES_SUMMARY, WEEKLY_SALES, MONTHLY_SALES, YESTERDAY_SALES)
+   - Payments received total     (CUSTOMER_PAYMENTS_TOTAL)
+   - Customer payment history    (CUSTOMER_HISTORY)
+   - Top debtors                 (TOP_DEBTORS)
+   - High-balance customers      (HIGH_BALANCE_CUSTOMERS)
+   - Overdue customers           (OVERDUE_CUSTOMERS)
+   - Late payer / who is late    (LATE_PAYER)
+   - Reports: daily / weekly / monthly / outstanding / customer / received
+     (DAILY_REPORT, WEEKLY_REPORT, MONTHLY_REPORT, OUTSTANDING_REPORT,
+      CUSTOMER_REPORT, RECEIVED_REPORT)
+   - Business insight / overview (BUSINESS_INSIGHT) — "business overview"
+   - Credit advice               (CREDIT_ADVICE) — "is it wise to give more credit?"
+
+C) KNOWLEDGE & GUIDES THE AI GIVES (offline, no hallucination — facts matched
+   to the real app)
+   - Greeting with LIVE khata stats (customer count + outstanding total)
+   - Help                          (HELP)
+   - App overview                  (APP_INFO) — "what can this app do?"
+   - Feature explanations with FULL FORM GUIDE: which input fields each page
+     has and WHAT TO ENTER IN EACH FIELD, e.g.
+       * "customer me kya likhna he?"        -> Name/Phone/Address/Initial Udhaar
+       * "payment form me kya dalna he?"     -> Customer/Against Udhaar/Amount/Method/Date
+       * "sale fields batao"                 -> Customer/Description/Amount/Date
+       * "udhaar form kaise bharein"         -> Customer/Description/Credit Amount/Due Date
+       * "product fields" / "stock kya he"   -> Name/Rate/Cost price/Stock
+       * "reports me kya bharun", reminders, receipts/PDF, settings, profit,
+         security, offline/sync guides
+   - Khata-opening guide: "khata kholna he", "naya khata banao", "khata create
+     karna he" -> explains how to get started
+   - Security & privacy answers   (securityAwareness)
+     * data stays on device, optional PIN lock, password hashed, never asks for
+       your PIN/password
+   - Currency formatting (Rs.) using the app's live numbers only — never invents
+     financial figures
+
+D) CLOUD AI (Layer 2 — OpenRouter) handles ANYTHING else:
+   - General business advice, market context for Pakistani retail
+   - Pricing tips, product/category knowledge, shop management
+   - Urdu <-> English translations
+   - Any personal or follow-up question, with the app's features + form fields
+     given to it so its answers always match the real app
+
+E) VOICE (fully working)
+   - Speak to the AI (microphone) — speech -> Web Speech API -> text -> AI
+   - AI speaks back — browser speechSynthesis (TTS), English & Urdu voices
+   - Voice CALL mode (mic button in chat): live transcript, tap to speak,
+     error handling (mic blocked shows Retry), mute toggle
+   - Only the FINAL spoken sentence is sent to the AI (no mid-word interruptions)
+   - Voice notes in chat: play/stop, list, instant reply
+
+F) CONVERSATION FEATURES
+   - Chat history persisted locally (IndexedDB), survives reload
+   - Memory: follow-up questions ("uska balance?") resolve to the active customer
+   - Multi-step flows: creating a customer continues until info is complete;
+     ambiguous names ask "kis customer ka matlab hai?"
+   - Clear all chats button
+
+---------------------------------------------------------------------------------
+3) HOW THE AI DECIDES (technical, for maintainers)
+---------------------------------------------------------------------------------
+- src/features/ai/intents.ts   -> detectIntent(): deterministic intent
+                                   classification (English + Urdu + Roman Urdu)
+- src/features/ai/engine.ts    -> runEngine(): turns the intent + live khata
+                                   snapshot into an answer or an action proposal
+- src/features/ai/responses.ts -> reply templates (en + ur) incl. greeting with
+                                   live stats and feature guides
+- src/features/ai/knowledge.ts -> FEATURES knowledge base (what/how/fields/
+                                   examples per page, en + ur) + formatFeature()
+- src/features/ai/nlp.ts       -> normalize, number extraction, customer matching,
+                                   language detection (ur vs en), pronoun resolution
+- src/features/ai/orchestrator.ts -> chooses local engine vs cloud fallback
+- src/features/ai/adapters.ts  -> cloud AI adapter (calls server /api/ai/chat)
+- server/routes/ai.ts          -> cloud chat endpoint; system prompt already
+                                   contains full app capability + FORM FIELDS guide
+- server/providers/            -> OpenRouter / Cloud / Ollama / Mock providers
+                                   (Mock only a last-resort fallback when no key)
+- Greetings/"hi", help, guides, balances -> handled OFFLINE (never hit cloud)
+- Financial answers ALWAYS come from the user's own live data, never invented
+
+---------------------------------------------------------------------------------
+4) QUICK-PERFORMANCE NOTES (verified working)
+---------------------------------------------------------------------------------
+- Local engine: greeting shows live stats; balance math correct
+  (e.g. Total 5,000 - Paid 1,000 = Outstanding 4,000)
+- Cloud: OpenRouter key configured & live; /health/ready shows app+postgres
+  healthy; Redis/background workers configured (Redis service not running on
+  this dev machine currently, workers quantity: email/messaging/sync)
+- Full test suite: 584 tests passing; tsc + eslint + build all green
+- Language rule: if the user types Urdu script, answers come in Urdu; otherwise
+  the reply matches the app UI language
+=============================================================================

@@ -1,0 +1,33 @@
+.env
+.env.local
+.env.*.local
+server/.env
+server/.local-auth.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Portable local Redis binaries (downloaded; start via tools\redis-start.cmd)
+tools/redis/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
