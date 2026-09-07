@@ -9,6 +9,7 @@
     "server:build": "npm run build --prefix server",
     "redis:start": "cmd /c tools\\redis-start.cmd",
     "build": "tsc -b && vite build",
+    "vercel-build": "npm run build && cd server && npm install && npm run build",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview"

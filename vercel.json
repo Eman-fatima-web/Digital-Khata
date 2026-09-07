@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "server/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server/index.ts"
+    },
+    {
+      "src": "/health(.*)",
+      "dest": "server/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "VERCEL": "1"
+  },
+  "crons": [
+    {
+      "path": "/api/jobs/run?job=dailySummary",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=weeklySummary",
+      "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/jobs/run?job=monthlySummary",
+      "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/jobs/run?job=overdueReminders",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/jobs/run?job=syncQueueCleanup",
+      "schedule": "0 3 * * 0"
+    }
+  ]
+}

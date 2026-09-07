@@ -14,6 +14,7 @@ import { messagesRouter } from './routes/messages.js'
 import { remindersRouter } from './routes/reminders.js'
 import { auditRouter } from './routes/audit.js'
 import { adminRouter } from './routes/admin.js'
+import { cronRouter } from './routes/cron.js'
 import { checkOllamaHealth } from './providers/OllamaProvider.js'
 import { getAIProvider } from './providers/index.js'
 import { startScheduler, stopScheduler, getScheduledJobs } from './services/scheduler.js'
@@ -196,6 +197,7 @@ app.use('/api/messages', validateCsrfToken, messagesRouter)
 app.use('/api/reminders', validateCsrfToken, remindersRouter)
 app.use('/api/audit', validateCsrfToken, auditRouter)
 app.use('/api/admin', validateCsrfToken, adminRouter)
+app.use('/api/jobs', cronRouter) // Vercel Cron handler
 
 // Error handling
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -206,19 +208,37 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   })
 })
 
-app.listen(PORT, () => {
-  logger.info({ port: PORT }, `Digital Khata Server running on port ${PORT}`)
-  startWorkers() // Central worker lifecycle — only starts when Redis is configured
-  startScheduler()
-})
+// Vercel serverless detection
+const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && !process.env.PORT
 
-function shutdown() {
-  logger.info('Shutting down...')
-  stopScheduler()
-  void stopWorkers().finally(() => process.exit(0))
+app.listen = function(...args: any[]) {
+  // In serverless environments, skip listen
+  if (isVercel) {
+    logger.info('Running in serverless mode (Vercel)')
+    return app
+  }
+  return express.prototype.listen.apply(app, args)
 }
 
-process.on('SIGTERM', shutdown)
-process.on('SIGINT', shutdown)
+if (!isVercel) {
+  app.listen(PORT, () => {
+    logger.info({ port: PORT }, `Digital Khata Server running on port ${PORT}`)
+    startWorkers() // Central worker lifecycle — only starts when Redis is configured
+    startScheduler()
+  })
+
+  function shutdown() {
+    logger.info('Shutting down...')
+    stopScheduler()
+    void stopWorkers().finally(() => process.exit(0))
+  }
+
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
+} else {
+  // Vercel serverless - initialize without listening
+  logger.info('Vercel serverless initialization')
+  // Workers and scheduler will be handled by Vercel Cron
+}
 
 export default app

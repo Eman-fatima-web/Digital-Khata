@@ -31,3 +31,5 @@ tools/redis/
 *.njsproj
 *.sln
 *.sw?
+
+.vercel
