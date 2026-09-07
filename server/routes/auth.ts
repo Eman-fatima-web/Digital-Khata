@@ -5,7 +5,7 @@ import { createHash } from 'crypto'
 import jwt from 'jsonwebtoken'
 import { generateToken, authenticateToken, revokeToken, JWT_SECRET, type AuthenticatedRequest } from '../middleware/auth.js'
 import { createChildLogger } from '../services/logger.js'
-import { query, getClient, isDatabaseAvailable } from '../database/index.js'
+import { query, getClient } from '../database/index.js'
 import { generateCsrfToken } from '../middleware/csrf.js'
 import {
   findUserByEmail,
@@ -123,7 +123,8 @@ authRouter.post('/login', async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase()
-    const useDb = await isDatabaseAvailable()
+    // Use database if DATABASE_URL is configured (Vercel/serverless environments)
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -234,7 +235,9 @@ authRouter.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'CNIC must be in format: XXXXX-XXXXXXX-X' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    // Use database if DATABASE_URL is configured (Vercel/serverless environments)
+    // Fall back to local file auth only if no database is configured
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const client = await getClient()
@@ -361,7 +364,7 @@ const passwordHash = await bcrypt.hash(password, 10)
 authRouter.post('/send-verification', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.userId!
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(`SELECT email, email_verified FROM users WHERE id = $1`, [userId])
@@ -449,7 +452,7 @@ authRouter.get('/verify-email', async (req, res) => {
       return res.status(400).json({ verified: false, error: 'Invalid verification link' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -529,7 +532,7 @@ authRouter.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ error: 'Email required' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(`SELECT id, email FROM users WHERE email = $1`, [email])
@@ -621,7 +624,7 @@ authRouter.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 8 characters' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -692,7 +695,7 @@ authRouter.post('/reset-with-pin', async (req, res) => {
       return res.status(429).json({ error: 'Too many requests. Try again later.' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     // Generic error messages to prevent user enumeration
     const GENERIC_ERROR = 'Invalid email or recovery PIN'
@@ -758,7 +761,7 @@ authRouter.post('/set-recovery-pin', authenticateToken, async (req: Authenticate
       return res.status(400).json({ error: 'Recovery PIN must be 4-8 digits' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(`SELECT password_hash FROM users WHERE id = $1`, [userId])
@@ -806,7 +809,7 @@ authRouter.put('/profile', authenticateToken, async (req: AuthenticatedRequest, 
     const userId = req.userId!
     const { fullName, phone, address, shopName, cnic } = req.body
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -881,7 +884,7 @@ authRouter.post('/change-password', authenticateToken, async (req: Authenticated
       return res.status(400).json({ error: 'New password must be at least 8 characters' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(

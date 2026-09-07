@@ -10,7 +10,7 @@ import {
   deleteUser,
   toPublicUser,
 } from '../services/localAuth.js'
-import { isDatabaseAvailable, query } from '../database/index.js'
+import { query } from '../database/index.js'
 
 export const adminRouter = Router()
 
@@ -18,7 +18,7 @@ adminRouter.use(requireAdmin)
 
 adminRouter.get('/stats', async (_req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const stats = await query(
@@ -52,7 +52,7 @@ adminRouter.get('/stats', async (_req: AuthenticatedRequest, res) => {
 
 adminRouter.get('/users', async (_req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -90,7 +90,7 @@ adminRouter.get('/users', async (_req: AuthenticatedRequest, res) => {
 
 adminRouter.get('/users/:id', async (req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     if (useDb) {
       const result = await query(
@@ -122,7 +122,7 @@ adminRouter.put('/users/:id', async (req: AuthenticatedRequest, res) => {
     const { role, isActive, emailVerified } = req.body ?? {}
     const userId = req.params.id
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     // Look up target user's current role to enforce protection rules
     let targetRole = 'user'
@@ -222,7 +222,7 @@ adminRouter.delete('/users/:id', async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'You cannot delete your own account' })
     }
 
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
 
     // Check target role to prevent superadmin deletion
     let targetRole = 'user'
@@ -265,7 +265,7 @@ adminRouter.delete('/users/:id', async (req: AuthenticatedRequest, res) => {
  */
 adminRouter.get('/businesses', async (_req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
     if (!useDb) return res.status(503).json({ error: 'Database not available' })
 
     const result = await query(
@@ -306,7 +306,7 @@ adminRouter.get('/businesses', async (_req: AuthenticatedRequest, res) => {
  */
 adminRouter.get('/users/:id/business-data', async (req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
     if (!useDb) return res.status(503).json({ error: 'Database not available' })
 
     const userRes = await query(
@@ -353,7 +353,7 @@ adminRouter.get('/users/:id/business-data', async (req: AuthenticatedRequest, re
  */
 adminRouter.get('/audit-log', async (req: AuthenticatedRequest, res) => {
   try {
-    const useDb = await isDatabaseAvailable()
+    const useDb = Boolean(process.env.DATABASE_URL)
     if (!useDb) return res.status(503).json({ error: 'Database not available' })
 
     if (req.role !== 'superadmin') {

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticateToken, type AuthenticatedRequest } from '../middleware/auth.js'
-import { query, isDatabaseAvailable } from '../database/index.js'
+import { query } from '../database/index.js'
 import { createChildLogger } from '../services/logger.js'
 
 const log = createChildLogger({ module: 'audit' })
@@ -13,7 +13,7 @@ export const auditRouter = Router()
  */
 auditRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    if (!isDatabaseAvailable()) {
+    if (!process.env.DATABASE_URL) {
       return res.status(503).json({ error: 'Database not available' })
     }
 
@@ -55,7 +55,7 @@ auditRouter.get('/', authenticateToken, async (req: AuthenticatedRequest, res) =
  */
 auditRouter.get('/count', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    if (!isDatabaseAvailable()) {
+    if (!process.env.DATABASE_URL) {
       return res.status(503).json({ error: 'Database not available' })
     }
 
