@@ -4,11 +4,11 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/[[...path]]"
     },
     {
       "source": "/health(.*)",
-      "destination": "/api/health$1"
+      "destination": "/api/[[...path]]"
     }
   ],
   "env": {
