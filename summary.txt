@@ -25,6 +25,9 @@ Real-world stack:
 ---------------------------------------------------------------------------------
 /dashboard
    - Today's overview, outstanding udhaar, recent activity, profit cards
+   - NO embedded AI hero anymore: a floating chat-bubble icon (bottom-start,
+     gradient) opens the AI chat (/ai) from every page. Quick-add FAB stays at
+     bottom-end. Both hidden on /ai.
 
 /customers  (+ /customers/:id detail page)
    - Add, edit, delete (soft), restore customers
@@ -93,6 +96,22 @@ Real-world stack:
    - Admin dashboard (roles: user / admin / superadmin)
 
 Auth pages: /login, /register, /verify-email, /forgot-password, /reset-password
+
+Password reset (works even without email setup):
+   - PRIMARY: Recovery PIN (no email needed). A 4-8 digit PIN is set at
+     registration (or later in Profile > Password Recovery PIN). On the login
+     screen choose "No email (Recovery PIN)" and enter email + PIN + new
+     password -> POST /api/auth/reset-with-pin. PIN is stored as a bcrypt hash
+     (users.recovery_pin_hash; ALTER TABLE migration auto-applied at startup).
+   - FALLBACK: email link. /forgot-password -> server generates a 1-hour
+     reset token + link. When SMTP is NOT configured the reset link is returned
+     in the response (devResetUrl) and the page shows it with Copy/Open buttons;
+     the console email log stays redacted. When SMTP IS configured the link is
+     emailed and devResetUrl is NOT exposed.
+   - /reset-password validates the token (SHA-256 hash stored) + expiry, then
+     updates the bcrypt password hash.
+   - /set-recovery-pin (authenticated) sets/changes the recovery PIN and
+     requires the current password.
 
 Extras:
    - Offline-first: everything works with no internet; syncs to cloud when online

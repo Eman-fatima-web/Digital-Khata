@@ -60,9 +60,16 @@ export function Header() {
   return (
     <header className="glass sticky top-0 z-30 px-3 py-2.5 sm:px-4 sm:py-3">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
-        <div className="cursor-pointer" onClick={() => navigate('/dashboard')}>
-          <h1 className="text-base font-bold text-primary-500 sm:text-lg">{t('app.name')}</h1>
-          <p className="hidden text-[10px] text-ink-muted sm:block">{t('app.tagline')}</p>
+        <div className="flex cursor-pointer items-center gap-2" onClick={() => navigate('/dashboard')}>
+          <img
+            src="/pwa-192x192.png"
+            alt={t('app.name')}
+            className="h-9 w-9 shrink-0 rounded-lg shadow-sm"
+          />
+          <div>
+            <h1 className="text-base font-bold text-primary-500 sm:text-lg">{t('app.name')}</h1>
+            <p className="hidden text-[10px] text-ink-muted sm:block">{t('app.tagline')}</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">

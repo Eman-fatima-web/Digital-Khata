@@ -1,0 +1,39 @@
+Digital Khata — Quick Setup
+===========================
+
+1. Install prerequisites
+   - Node.js 20 or later (https://nodejs.org)
+   - (Optional) PostgreSQL / Supabase for cloud sync and multi-device use
+
+2. Unzip the project and open a terminal in the root folder.
+
+3. Install dependencies (run once):
+   npm install
+   cd server
+   npm install
+   cd ..
+
+4. Configure the server:
+   Copy server/.env.example to server/.env
+   Edit server/.env and set at minimum:
+     DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DBNAME
+     JWT_SECRET=any-random-string-at-least-16-chars
+   If you don't have a PostgreSQL database, leave DATABASE_URL blank.
+   The server will use a local file (server/.local-auth.json) for testing.
+
+5. Start the server (Terminal 1):
+   cd server
+   npm run dev
+   (starts on http://localhost:3001)
+
+6. Start the frontend (Terminal 2):
+   npm run dev
+   (starts on http://localhost:5173)
+
+7. Open http://localhost:5173 in your browser and register.
+
+Notes
+-----
+- Schema.sql runs automatically on first server start when DATABASE_URL is set.
+- To add email verification and reminders, configure SMTP_HOST/SMTP_USER/SMTP_PASS in server/.env.
+- For Redis-backed background workers (optional), set REDIS_URL in server/.env.

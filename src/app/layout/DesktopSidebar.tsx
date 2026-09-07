@@ -11,9 +11,16 @@ export function DesktopSidebar() {
 
   return (
     <aside className="hidden lg:fixed lg:inset-y-0 lg:start-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-e lg:border-surface-hairline lg:bg-surface-card">
-      <div className="border-b border-surface-hairline px-6 py-5">
-        <h1 className="text-xl font-bold text-primary-500">{t('app.name')}</h1>
-        <p className="text-xs text-ink-muted">{t('app.tagline')}</p>
+      <div className="flex items-center gap-3 border-b border-surface-hairline px-6 py-5">
+        <img
+          src="/pwa-192x192.png"
+          alt={t('app.name')}
+          className="h-10 w-10 shrink-0 rounded-xl shadow-sm"
+        />
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold text-primary-500">{t('app.name')}</h1>
+          <p className="truncate text-xs text-ink-muted">{t('app.tagline')}</p>
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">

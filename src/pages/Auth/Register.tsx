@@ -19,6 +19,8 @@ export default function Register() {
   const [address, setAddress] = useState('')
   const [cnic, setCnic] = useState('')
   const [businessName, setBusinessName] = useState('')
+  const [recoveryPin, setRecoveryPin] = useState('')
+  const [confirmRecoveryPin, setConfirmRecoveryPin] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: FormEvent) => {
@@ -40,6 +42,16 @@ export default function Register() {
       return
     }
 
+    if (recoveryPin && !/^\d{4,8}$/.test(recoveryPin)) {
+      setError('Recovery PIN must be 4-8 digits')
+      return
+    }
+
+    if (recoveryPin !== confirmRecoveryPin) {
+      setError('Recovery PINs do not match')
+      return
+    }
+
     // Basic CNIC validation if provided
     if (cnic && !/^\d{5}-\d{7}-\d{1}$/.test(cnic)) {
       setError('CNIC must be in format: XXXXX-XXXXXXX-X')
@@ -47,7 +59,7 @@ export default function Register() {
     }
 
     try {
-      await register(email, password, fullName, phone || undefined, address || undefined, cnic || undefined, businessName || undefined)
+      await register(email, password, fullName, phone || undefined, address || undefined, cnic || undefined, businessName || undefined, recoveryPin || undefined)
       // No email verification required — go straight into the app as admin/user.
       navigate('/dashboard', { replace: true })
     } catch (err) {
@@ -182,6 +194,33 @@ export default function Register() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter password"
               autoComplete="new-password"
+              disabled={isLoading}
+            />
+
+            <div className="rounded-lg border border-primary-500/30 bg-primary-500/5 px-3 py-2 text-xs text-ink-muted">
+              <p className="font-medium text-ink">Recovery PIN (recommended)</p>
+              <p className="mt-1">Set a 4-8 digit PIN. If you forget your password, you can reset it with this PIN — no email needed.</p>
+            </div>
+
+            <PasswordInput
+              id="recoveryPin"
+              label="Recovery PIN"
+              value={recoveryPin}
+              onChange={(e) => setRecoveryPin(e.target.value)}
+              placeholder="4-8 digits, e.g. 4829"
+              autoComplete="off"
+              inputMode="numeric"
+              disabled={isLoading}
+            />
+
+            <PasswordInput
+              id="confirmRecoveryPin"
+              label="Confirm Recovery PIN"
+              value={confirmRecoveryPin}
+              onChange={(e) => setConfirmRecoveryPin(e.target.value)}
+              placeholder="Re-enter recovery PIN"
+              autoComplete="off"
+              inputMode="numeric"
               disabled={isLoading}
             />
 

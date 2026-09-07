@@ -15,11 +15,14 @@ import {
   X,
   ArrowLeft,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react'
 
 import { useAuth } from '../../context/AuthProvider'
+import { setRecoveryPin } from '../../services/api'
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
+import PasswordInput from '../../components/ui/PasswordInput'
 import { useToast } from '../../components/ui/Toast'
 
 export default function Profile() {
@@ -36,6 +39,34 @@ export default function Profile() {
     address: user?.address || '',
     cnic: user?.cnic || '',
   })
+
+  const [pinForm, setPinForm] = useState({
+    currentPassword: '',
+    recoveryPin: '',
+    confirmRecoveryPin: '',
+  })
+  const [busyPin, setBusyPin] = useState(false)
+
+  const handleSetRecoveryPin = async () => {
+    setBusyPin(true)
+    try {
+      if (!/^\d{4,8}$/.test(pinForm.recoveryPin)) {
+        toast('error', 'Recovery PIN must be 4-8 digits')
+        return
+      }
+      if (pinForm.recoveryPin !== pinForm.confirmRecoveryPin) {
+        toast('error', 'Recovery PINs do not match')
+        return
+      }
+      await setRecoveryPin(pinForm.currentPassword, pinForm.recoveryPin)
+      setPinForm({ currentPassword: '', recoveryPin: '', confirmRecoveryPin: '' })
+      toast('success', 'Recovery PIN set successfully')
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Failed to set recovery PIN')
+    } finally {
+      setBusyPin(false)
+    }
+  }
 
   if (!isAuthenticated || !user) {
     return (
@@ -296,6 +327,57 @@ export default function Profile() {
               Logout
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Recovery PIN Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ShieldCheck className="h-5 w-5 text-primary-500" />
+            Password Recovery PIN
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-ink-muted">
+            Set a 4-8 digit recovery PIN. If you forget your password, you can reset it from the
+            login screen with this PIN — no email needed.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <PasswordInput
+              id="pin-current-password"
+              label="Current Password"
+              value={pinForm.currentPassword}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+              placeholder="Enter current password"
+              autoComplete="current-password"
+            />
+            <div />
+            <PasswordInput
+              id="pin-value"
+              label="Recovery PIN"
+              value={pinForm.recoveryPin}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, recoveryPin: e.target.value }))}
+              placeholder="4-8 digits, e.g. 4829"
+              autoComplete="off"
+              inputMode="numeric"
+            />
+            <PasswordInput
+              id="pin-confirm"
+              label="Confirm Recovery PIN"
+              value={pinForm.confirmRecoveryPin}
+              onChange={(e) => setPinForm((prev) => ({ ...prev, confirmRecoveryPin: e.target.value }))}
+              placeholder="Re-enter recovery PIN"
+              autoComplete="off"
+              inputMode="numeric"
+            />
+          </div>
+
+          <Button onClick={handleSetRecoveryPin} isLoading={busyPin} className="gap-1.5">
+            <ShieldCheck size={16} />
+            Save Recovery PIN
+          </Button>
         </CardContent>
       </Card>
     </div>

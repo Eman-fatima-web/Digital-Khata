@@ -17,15 +17,19 @@ import {
   setResetToken,
   resetPasswordWithToken,
   setPasswordHash,
+  setRecoveryPin,
+  resetPasswordWithPin,
   updateUserProfile,
 } from '../services/localAuth.js'
-import { sendMail } from '../config/mail.js'
+import { sendMail, transporter } from '../config/mail.js'
 
 const log = createChildLogger({ module: 'auth' })
 
 export const authRouter = Router()
 
 const APP_URL = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'
+
+const RECOVERY_PIN_RE = /^\d{4,8}$/
 
 /**
  * POST /api/auth/refresh
@@ -185,7 +189,7 @@ authRouter.post('/login', async (req, res) => {
  */
 authRouter.post('/register', async (req, res) => {
   try {
-    const { email, password, businessName, fullName, phone, address, cnic } = req.body
+    const { email, password, businessName, fullName, phone, address, cnic, recoveryPin } = req.body
 
     // Server-side validation (never trust the client)
     if (typeof email !== 'string' || !email.trim()) {
@@ -196,6 +200,11 @@ authRouter.post('/register', async (req, res) => {
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
+    if (recoveryPin !== undefined && recoveryPin !== null && recoveryPin !== '') {
+      if (typeof recoveryPin !== 'string' || !RECOVERY_PIN_RE.test(recoveryPin.trim())) {
+        return res.status(400).json({ error: 'Recovery PIN must be 4-8 digits' })
+      }
     }
 
     const normalizedEmail = email.trim().toLowerCase()
@@ -223,7 +232,8 @@ authRouter.post('/register', async (req, res) => {
           return res.status(409).json({ error: 'An account with this email already exists' })
         }
 
-        const passwordHash = await bcrypt.hash(password, 10)
+const passwordHash = await bcrypt.hash(password, 10)
+        const recoveryPinHash = recoveryPin ? await bcrypt.hash(recoveryPin.trim(), 10) : null
 
         // Determine role from SUPERADMIN_EMAIL / ADMIN_EMAIL env
         const isSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || '')
@@ -246,10 +256,10 @@ authRouter.post('/register', async (req, res) => {
         const businessId = businessResult.rows[0].id
 
         const userResult = await client.query(
-          `INSERT INTO users (email, password_hash, business_id, role, full_name, phone, address, cnic)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `INSERT INTO users (email, password_hash, business_id, role, full_name, phone, address, cnic, recovery_pin_hash)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING id`,
-          [normalizedEmail, passwordHash, businessId, userRole, fullName?.trim() || null, phone?.trim() || null, address?.trim() || null, cnic?.trim() || null]
+          [normalizedEmail, passwordHash, businessId, userRole, fullName?.trim() || null, phone?.trim() || null, address?.trim() || null, cnic?.trim() || null, recoveryPinHash]
         )
         const userId = userResult.rows[0].id
 
@@ -300,6 +310,7 @@ authRouter.post('/register', async (req, res) => {
           address: address?.trim() || undefined,
           cnic: cnic?.trim() || undefined,
         },
+        recoveryPin?.trim() || undefined,
       )
       const token = generateToken(user.id, user.businessId, user.role || 'user')
 
@@ -322,7 +333,7 @@ authRouter.post('/register', async (req, res) => {
     }
   } catch (error) {
     log.error({ err: error }, 'Registration error')
-    res.status(500).json({ error: 'Registration failed' })
+    res.status(500).json({ error: 'Registration failed. Please check your database connection and try again.' })
   }
 })
 
@@ -527,7 +538,10 @@ authRouter.post('/forgot-password', async (req, res) => {
       `
 
       await sendMail(user.email, 'Reset your password — Digital Khata', html)
-      res.json({ sent: true })
+      res.json({
+        sent: true,
+        ...(!transporter ? { devResetUrl: resetUrl } : {}),
+      })
     } else {
       const user = findUserByEmail(email)
       if (!user) {
@@ -554,7 +568,10 @@ authRouter.post('/forgot-password', async (req, res) => {
       `
 
       await sendMail(user.email, 'Reset your password — Digital Khata', html)
-      res.json({ sent: true })
+      res.json({
+        sent: true,
+        ...(!transporter ? { devResetUrl: resetUrl } : {}),
+      })
     }
   } catch (error) {
     log.error({ err: error }, 'Forgot password error')
@@ -621,6 +638,131 @@ authRouter.post('/reset-password', async (req, res) => {
   } catch (error) {
     log.error({ err: error }, 'Reset password error')
     res.status(500).json({ error: 'Password reset failed' })
+  }
+})
+
+/**
+ * POST /api/auth/reset-with-pin
+ * Reset a forgotten password using the recovery PIN that was set at
+ * registration (or later from Profile). Works WITHOUT email/SMTP.
+ */
+authRouter.post('/reset-with-pin', async (req, res) => {
+  try {
+    const { email, pin, password } = req.body
+
+    if (!email || !pin || !password) {
+      return res.status(400).json({ error: 'Email, recovery PIN, and new password are required' })
+    }
+    if (typeof pin !== 'string' || !RECOVERY_PIN_RE.test(pin.trim())) {
+      return res.status(400).json({ error: 'Recovery PIN must be 4-8 digits' })
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
+
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!checkResetRateLimit(normalizedEmail)) {
+      return res.status(429).json({ error: 'Too many requests. Try again later.' })
+    }
+
+    const useDb = await isDatabaseAvailable()
+
+    if (useDb) {
+      const result = await query(
+        `SELECT id, recovery_pin_hash FROM users WHERE LOWER(TRIM(email)) = $1`,
+        [normalizedEmail]
+      )
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'No account found with that email' })
+      }
+
+      const user = result.rows[0]
+      if (!user.recovery_pin_hash) {
+        return res.status(400).json({
+          error: 'No recovery PIN set for this account. Set one from Profile > Recovery PIN.',
+        })
+      }
+
+      const pinOk = await bcrypt.compare(pin.trim(), user.recovery_pin_hash)
+      if (!pinOk) {
+        return res.status(400).json({ error: 'Incorrect recovery PIN' })
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10)
+      await query(
+        `UPDATE users SET password_hash = $1, password_reset_token = NULL,
+          password_reset_token_expiry = NULL, updated_at = NOW() WHERE id = $2`,
+        [passwordHash, user.id]
+      )
+
+      res.json({ success: true })
+    } else {
+      const result = await resetPasswordWithPin(normalizedEmail, pin.trim(), password)
+      if (result.success) {
+        res.json({ success: true })
+      } else {
+        res.status(400).json({ error: result.error || 'Failed to reset password' })
+      }
+    }
+  } catch (error) {
+    log.error({ err: error }, 'Reset password with PIN error')
+    res.status(500).json({ error: 'Password reset failed' })
+  }
+})
+
+/**
+ * POST /api/auth/set-recovery-pin
+ * Set or change the recovery PIN (requires the current password).
+ */
+authRouter.post('/set-recovery-pin', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.userId!
+    const { currentPassword, recoveryPin } = req.body
+
+    if (!currentPassword || !recoveryPin) {
+      return res.status(400).json({ error: 'Current password and recovery PIN are required' })
+    }
+    if (typeof recoveryPin !== 'string' || !RECOVERY_PIN_RE.test(recoveryPin.trim())) {
+      return res.status(400).json({ error: 'Recovery PIN must be 4-8 digits' })
+    }
+
+    const useDb = await isDatabaseAvailable()
+
+    if (useDb) {
+      const result = await query(`SELECT password_hash FROM users WHERE id = $1`, [userId])
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      const validPassword = await bcrypt.compare(currentPassword, result.rows[0].password_hash)
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' })
+      }
+
+      const recoveryPinHash = await bcrypt.hash(recoveryPin.trim(), 10)
+      await query(
+        `UPDATE users SET recovery_pin_hash = $1, updated_at = NOW() WHERE id = $2`,
+        [recoveryPinHash, userId]
+      )
+      res.json({ success: true })
+    } else {
+      const user = findUserById(userId)
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+
+      const validPassword = await verifyLocalPassword(currentPassword, user.passwordHash)
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Current password is incorrect' })
+      }
+
+      await setRecoveryPin(userId, recoveryPin.trim())
+      res.json({ success: true })
+    }
+  } catch (error) {
+    log.error({ err: error }, 'Set recovery PIN error')
+    res.status(500).json({ error: 'Failed to set recovery PIN' })
   }
 })
 

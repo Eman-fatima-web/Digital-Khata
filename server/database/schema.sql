@@ -34,6 +34,7 @@ CREATE TABLE users (
   verification_token_expiry TIMESTAMP WITH TIME ZONE,
   password_reset_token VARCHAR(255),
   password_reset_token_expiry TIMESTAMP WITH TIME ZONE,
+  recovery_pin_hash VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

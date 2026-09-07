@@ -26,6 +26,7 @@ export function AppLayout() {
   const handleAddUdhaar = () => navigate('/udhaar?add=true')
   const handleAddPayment = () => navigate('/payments?add=true')
   const handleAddSale = () => navigate('/sales?add=true')
+  const handleOpenAI = () => navigate('/ai')
 
   return (
     <ToastProvider>
@@ -47,6 +48,7 @@ export function AppLayout() {
         <MobileBottomNav />
         {showFAB && (
           <GlobalFAB
+            onOpenAI={handleOpenAI}
             onAddCustomer={handleAddCustomer}
             onAddUdhaar={handleAddUdhaar}
             onAddPayment={handleAddPayment}

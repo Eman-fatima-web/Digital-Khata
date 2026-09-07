@@ -23,9 +23,13 @@ import { getQueueMetrics } from './queues/index.js'
 import { validateCsrfToken } from './middleware/csrf.js'
 import { authenticateToken } from './middleware/auth.js'
 import { requireAdmin } from './middleware/admin.js'
+import { ensureSchema } from './database/ensureSchema.js'
 
 const app = express()
 const PORT = process.env.PORT || 3001
+
+// Apply schema.sql automatically on first start (idempotent IF NOT EXISTS).
+await ensureSchema()
 
 // Trust the first proxy hop so rate limiting keys off the real client IP
 // behind a reverse proxy / load balancer in production.

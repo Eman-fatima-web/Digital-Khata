@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   Wallet,
   ArrowDownLeft,
@@ -10,9 +10,10 @@ import {
   Clock,
   ShoppingCart,
   Brain,
-  Send,
   Bell,
   TrendingUp,
+  ArrowUpRight,
+  CalendarDays,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -28,6 +29,18 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageLoader } from '../../components/ui/PageLoader'
 import type { ActivityItem } from '../../core/types'
+
+function timeAgo(date: string, language: 'en' | 'ur'): string {
+  const diff = Date.now() - new Date(date).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return language === 'ur' ? 'ابھی ابھی' : 'Just now'
+  if (mins < 60) return language === 'ur' ? `${mins} منٹ پہلے` : `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return language === 'ur' ? `${hrs} گھنٹے پہلے` : `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return language === 'ur' ? `${days} دن پہلے` : `${days}d ago`
+  return formatDate(date, language)
+}
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -215,25 +228,6 @@ function Dashboard() {
     [customers, udhaar, payments, sales, language],
   )
 
-  const [aiInput, setAiInput] = useState('')
-
-  const aiPrompts = [
-    t('dashboard.aiPrompts.dailySummary'),
-    t('dashboard.aiPrompts.customerBalance'),
-    t('dashboard.aiPrompts.addCustomer'),
-    t('dashboard.aiPrompts.overdueReport'),
-  ]
-
-  const handleAiSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!aiInput.trim()) return
-    navigate('/ai', { state: { initialQuery: aiInput.trim() } })
-  }
-
-  const handlePromptClick = (prompt: string) => {
-    navigate('/ai', { state: { initialQuery: prompt } })
-  }
-
   const greeting = useMemo(() => {
     const hour = new Date().getHours()
     if (hour < 12) return t('dashboard.greetingMorning')
@@ -247,57 +241,25 @@ function Dashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <section>
-        <p className="text-sm font-semibold text-success-500">{greeting}</p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {t('dashboard.title')}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted sm:text-base">
-          {t('dashboard.subtitle')}
-        </p>
-      </section>
-
-      {/* AI Hero Section */}
-      <section className="relative overflow-hidden rounded-2xl border border-primary-500/10 bg-gradient-to-br from-primary-50 via-surface-card to-success-50/40 p-5 shadow-sm sm:p-6">
-        <div className="absolute -end-8 -top-8 h-32 w-32 rounded-full bg-primary-500/5 blur-2xl" />
-        <div className="absolute -bottom-6 -start-6 h-24 w-24 rounded-full bg-success-500/5 blur-2xl" />
-        <div className="relative flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-md shadow-primary-500/20">
-            <Brain size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-bold text-ink sm:text-lg">
-              {t('dashboard.aiHeroTitle')}
-            </h2>
-            <form onSubmit={handleAiSubmit} className="mt-3 flex items-center gap-2">
-              <input
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                placeholder={t('dashboard.aiHeroPlaceholder')}
-                className="min-w-0 flex-1 rounded-xl border border-surface-hairline bg-surface-card px-4 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-400 focus:ring-2 focus:ring-primary-400"
-              />
-              <button
-                type="submit"
-                disabled={!aiInput.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Send size={16} />
-              </button>
-            </form>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {aiPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => handlePromptClick(prompt)}
-                  className="rounded-full border border-surface-hairline/80 bg-surface-card/80 px-3 py-1.5 text-xs font-medium text-ink-muted backdrop-blur-sm transition hover:border-primary-300 hover:text-primary-600"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
+      <section className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-success-500">{greeting}</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            {t('dashboard.title')}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-muted sm:text-base">
+            {t('dashboard.subtitle')}
+          </p>
         </div>
+        <span className="inline-flex items-center gap-2 rounded-xl border border-surface-hairline bg-surface-card px-3.5 py-2 text-xs font-semibold text-ink-muted shadow-sm">
+          <CalendarDays size={14} className="text-primary-500" />
+          {new Date().toLocaleDateString(language === 'ur' ? 'ur-PK' : 'en-PK', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}
+        </span>
       </section>
 
       {/* Proactive Insights */}
@@ -398,26 +360,29 @@ function Dashboard() {
 
       <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Last 7 Days Sales</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('dashboard.weeklySales')}</CardTitle>
+            <span className="rounded-full bg-success-50 px-2.5 py-1 text-xs font-bold text-success-600 tabular-nums">
+              {formatCurrency(weeklySalesTrend.reduce((sum, d) => sum + d.value, 0))}
+            </span>
           </CardHeader>
           <CardContent>
             {weeklySalesTrend.every((d) => d.value === 0) ? (
-              <EmptyState icon={TrendingUp} title={t('reports.noData')} description="" className="min-h-[160px]" />
+              <EmptyState icon={TrendingUp} title={t('reports.noData')} description={t('dashboard.weekTotal')} className="min-h-[160px]" />
             ) : (
-              <div className="flex h-40 items-end gap-2">
+              <div className="flex h-44 items-end gap-2">
                 {weeklySalesTrend.map((d) => {
                   const max = Math.max(...weeklySalesTrend.map((x) => x.value), 1)
                   return (
-                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
+                    <div key={d.label} className="flex flex-1 flex-col items-center gap-1" title={`${d.label}: ${formatCurrency(d.value)}`}>
                       <span className="text-[10px] font-semibold text-ink-muted tabular-nums">
-                        {d.value > 0 ? formatCurrency(d.value) : ''}
+                        {d.value > 0 ? formatCurrency(d.value).replace(/Rs\.?\s?/, '') : ''}
                       </span>
                       <div
-                        className="w-full rounded-t-lg bg-gradient-to-t from-success-500 to-success-400"
+                        className="w-full rounded-t-lg bg-gradient-to-t from-success-500 to-success-300"
                         style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 6 : 2)}%`, minHeight: '6px' }}
                       />
-                      <span className="text-[10px] text-ink-muted">{d.label}</span>
+                      <span className="text-[10px] font-medium text-ink-muted">{d.label}</span>
                     </div>
                   )
                 })}
@@ -428,38 +393,59 @@ function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Udhaar vs Payments (This Month)</CardTitle>
+            <CardTitle>{t('dashboard.udhaarVsPayments')}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink">Udhaar Given</span>
-                  <span className="font-semibold text-error">{formatCurrency(udhaarVsPayments.udhaar)}</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-surface">
-                  <div
-                    className="h-full rounded-full bg-error"
-                    style={{
-                      width: `${Math.min((udhaarVsPayments.udhaar / Math.max(udhaarVsPayments.udhaar, udhaarVsPayments.payments, 1)) * 100, 100)}%`,
-                    }}
-                  />
-                </div>
+          <CardContent className="space-y-5">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 font-medium text-ink">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-warning/10 text-warning">
+                    <ArrowUpRight size={14} />
+                  </span>
+                  {t('dashboard.udhaarGiven')}
+                </span>
+                <span className="font-bold text-danger tabular-nums">{formatCurrency(udhaarVsPayments.udhaar)}</span>
               </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink">Payments Received</span>
-                  <span className="font-semibold text-success-500">{formatCurrency(udhaarVsPayments.payments)}</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-surface">
-                  <div
-                    className="h-full rounded-full bg-success-500"
-                    style={{
-                      width: `${Math.min((udhaarVsPayments.payments / Math.max(udhaarVsPayments.udhaar, udhaarVsPayments.payments, 1)) * 100, 100)}%`,
-                    }}
-                  />
-                </div>
+              <div className="h-3 overflow-hidden rounded-full bg-surface">
+                <div
+                  className="h-full rounded-full bg-warning transition-all duration-500"
+                  style={{
+                    width: `${Math.min((udhaarVsPayments.udhaar / Math.max(udhaarVsPayments.udhaar, udhaarVsPayments.payments, 1)) * 100, 100)}%`,
+                  }}
+                />
               </div>
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 font-medium text-ink">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-success-50 text-success-500">
+                    <ArrowDownLeft size={14} />
+                  </span>
+                  {t('dashboard.paymentsReceived')}
+                </span>
+                <span className="font-bold text-success-600 tabular-nums">{formatCurrency(udhaarVsPayments.payments)}</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-surface">
+                <div
+                  className="h-full rounded-full bg-success-500 transition-all duration-500"
+                  style={{
+                    width: `${Math.min((udhaarVsPayments.payments / Math.max(udhaarVsPayments.udhaar, udhaarVsPayments.payments, 1)) * 100, 100)}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t border-surface-hairline pt-3.5 text-sm">
+              <span className="font-medium text-ink-muted">{t('dashboard.netReceived')}</span>
+              <span
+                className={cn(
+                  'font-bold tabular-nums',
+                  udhaarVsPayments.payments - udhaarVsPayments.udhaar >= 0
+                    ? 'text-success-600'
+                    : 'text-danger',
+                )}
+              >
+                {formatCurrency(udhaarVsPayments.payments - udhaarVsPayments.udhaar)}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -468,26 +454,40 @@ function Dashboard() {
       <section className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Top Customers by Outstanding</CardTitle>
+            <CardTitle>{t('reports.topCustomers')}</CardTitle>
           </CardHeader>
           <CardContent>
             {topDebtors.length === 0 ? (
               <EmptyState icon={Users} title={t('reports.noData')} description="" className="min-h-[120px]" />
             ) : (
-              <div className="space-y-3">
-                {topDebtors.map((item) => {
+              <div className="space-y-3.5">
+                {topDebtors.map((item, index) => {
                   const max = Math.max(...topDebtors.map((x) => x.amount), 1)
                   return (
-                    <div key={item.name}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="truncate font-medium text-ink">{item.name}</span>
-                        <span className="font-semibold text-danger">{formatCurrency(item.amount)}</span>
-                      </div>
-                      <div className="h-2.5 overflow-hidden rounded-full bg-surface">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-error"
-                          style={{ width: `${(item.amount / max) * 100}%` }}
-                        />
+                    <div key={item.name} className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                          index === 0
+                            ? 'bg-warning/15 text-warning'
+                            : index === 1
+                              ? 'bg-info/10 text-info'
+                              : 'bg-surface-raised text-ink-muted',
+                        )}
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span className="truncate font-medium text-ink">{item.name}</span>
+                          <span className="font-semibold text-danger tabular-nums">{formatCurrency(item.amount)}</span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-surface">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-error"
+                            style={{ width: `${(item.amount / max) * 100}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )
@@ -615,7 +615,23 @@ function Dashboard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-ink">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-ink-muted">{item.subtitle} · {formatDate(item.date)}</p>
+                    <p className="mt-0.5 truncate text-xs text-ink-muted">
+                      <span
+                        className={cn(
+                          'me-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase',
+                          item.type === 'udhaar' && 'bg-warning/10 text-warning',
+                          item.type === 'payment' && 'bg-success-50 text-success-600',
+                          item.type === 'sale' && 'bg-info/10 text-info',
+                        )}
+                      >
+                        {item.type === 'udhaar'
+                          ? t('nav.udhaar')
+                          : item.type === 'payment'
+                            ? t('nav.payments')
+                            : t('nav.sales')}
+                      </span>
+                      {item.subtitle} · {timeAgo(item.date, language)}
+                    </p>
                   </div>
                   <p className={`
                     shrink-0 font-semibold tabular-nums

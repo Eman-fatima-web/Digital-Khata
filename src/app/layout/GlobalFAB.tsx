@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, UserPlus, BookOpen, CreditCard, ShoppingCart } from 'lucide-react'
+import { Plus, UserPlus, BookOpen, CreditCard, ShoppingCart, MessageCircle } from 'lucide-react'
 
 import { useTranslation } from '../../core/i18n'
 import { cn } from '../../lib/utils'
@@ -12,11 +12,13 @@ type FABAction = {
 }
 
 export function GlobalFAB({
+  onOpenAI,
   onAddCustomer,
   onAddUdhaar,
   onAddPayment,
   onAddSale,
 }: {
+  onOpenAI: () => void
   onAddCustomer: () => void
   onAddUdhaar: () => void
   onAddPayment: () => void
@@ -33,7 +35,17 @@ export function GlobalFAB({
   ]
 
   return (
-    <div className="fixed bottom-20 end-4 z-40 lg:bottom-8 lg:end-8">
+    <>
+      <button
+        onClick={onOpenAI}
+        className="fixed bottom-20 start-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-success-500 text-white shadow-lg shadow-primary-500/30 transition-transform hover:scale-105 lg:bottom-8 lg:start-8"
+        aria-label={t('fab.askAI')}
+        title={t('fab.askAI')}
+      >
+        <MessageCircle size={26} />
+      </button>
+
+      <div className="fixed bottom-20 end-4 z-40 lg:bottom-8 lg:end-8">
       {isOpen && (
         <div className="mb-3 flex flex-col items-end gap-2">
           {actions.map((action) => {
@@ -69,6 +81,7 @@ export function GlobalFAB({
       >
         <Plus size={28} />
       </button>
-    </div>
+      </div>
+    </>
   )
 }

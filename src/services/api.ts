@@ -142,13 +142,14 @@ export async function register(
   address?: string,
   cnic?: string,
   businessName?: string,
+  recoveryPin?: string,
 ): Promise<AuthTokens> {
   const response = await safeFetch(`${API_BASE_URL}/api/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password, fullName, phone, address, cnic, businessName }),
+    body: JSON.stringify({ email, password, fullName, phone, address, cnic, businessName, recoveryPin }),
   })
 
   if (!response.ok) {
@@ -345,7 +346,9 @@ export async function changePassword(
 /**
  * Request a password reset email
  */
-export async function forgotPassword(email: string): Promise<{ sent: boolean }> {
+export async function forgotPassword(
+  email: string
+): Promise<{ sent: boolean; devResetUrl?: string }> {
   const response = await safeFetch(`${API_BASE_URL}/api/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -368,6 +371,39 @@ export async function resetPassword(
     body: JSON.stringify({ token, id: userId, password }),
   })
   return response.json().catch(() => ({ success: false, error: 'Password reset request failed' }))
+}
+
+/**
+ * Reset a forgotten password using the recovery PIN — works without email
+ */
+export async function resetPasswordWithPin(
+  email: string,
+  pin: string,
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  const response = await safeFetch(`${API_BASE_URL}/api/auth/reset-with-pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, pin, password }),
+  })
+  return response.json().catch(() => ({ success: false, error: 'Password reset request failed' }))
+}
+
+/**
+ * Set or change the recovery PIN for the authenticated user
+ */
+export async function setRecoveryPin(
+  currentPassword: string,
+  recoveryPin: string
+): Promise<{ success: boolean; error?: string }> {
+  const response = await authenticatedRequest<{ success: boolean; error?: string }>(
+    '/api/auth/set-recovery-pin',
+    {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, recoveryPin }),
+    }
+  )
+  return response
 }
 
 /**

@@ -25,6 +25,7 @@ type LocalUser = {
   verificationTokenExpiry?: string
   passwordResetToken?: string
   passwordResetTokenExpiry?: string
+  recoveryPinHash?: string
   createdAt: string
 }
 
@@ -62,6 +63,7 @@ export async function createUser(
   password: string,
   businessName: string,
   profile: Partial<Pick<LocalUser, 'fullName' | 'phone' | 'address' | 'cnic'>> = {},
+  recoveryPin?: string,
 ): Promise<LocalUser> {
   const store = loadStore()
   const passwordHash = await bcrypt.hash(password, 10)
@@ -89,6 +91,7 @@ export async function createUser(
     emailVerified: false,
     role: isSuperAdminEmail ? 'superadmin' : isAdminEmail ? 'admin' : 'user',
     isActive: true,
+    recoveryPinHash: recoveryPin ? await bcrypt.hash(recoveryPin, 10) : undefined,
     createdAt: new Date().toISOString(),
   }
   store.users.push(user)
@@ -165,6 +168,40 @@ export function setPasswordHash(userId: string, passwordHash: string): void {
   if (!user) throw new Error('User not found')
   user.passwordHash = passwordHash
   saveStore(store)
+}
+
+export async function setRecoveryPin(userId: string, pin: string): Promise<boolean> {
+  const store = loadStore()
+  const user = store.users.find((u) => u.id === userId)
+  if (!user) return false
+  user.recoveryPinHash = await bcrypt.hash(pin, 10)
+  saveStore(store)
+  return true
+}
+
+export async function resetPasswordWithPin(
+  email: string,
+  pin: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  const store = loadStore()
+  const normalized = email.trim().toLowerCase()
+  const user = store.users.find((u) => u.email.trim().toLowerCase() === normalized)
+  if (!user) {
+    return { success: false, error: 'No account found with that email' }
+  }
+  if (!user.recoveryPinHash) {
+    return { success: false, error: 'No recovery PIN set for this account' }
+  }
+  const ok = await bcrypt.compare(pin, user.recoveryPinHash)
+  if (!ok) {
+    return { success: false, error: 'Incorrect recovery PIN' }
+  }
+  user.passwordHash = await bcrypt.hash(newPassword, 10)
+  delete user.passwordResetToken
+  delete user.passwordResetTokenExpiry
+  saveStore(store)
+  return { success: true }
 }
 
 export function updateUserProfile(

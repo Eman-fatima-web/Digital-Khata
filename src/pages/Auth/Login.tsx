@@ -34,7 +34,12 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface p-4">
-      <Card className="w-full max-w-md">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <img src="/pwa-192x192.png" alt="Digital Khata logo" className="h-16 w-16 rounded-2xl shadow-sm" />
+          <span className="text-2xl font-bold text-primary-500">Digital Khata</span>
+        </div>
+        <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
             <LogIn className="h-5 w-5" />
@@ -94,6 +99,7 @@ export default function Login() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }
