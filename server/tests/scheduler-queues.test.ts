@@ -46,12 +46,12 @@ describe('Scheduler (Integration 7)', () => {
     vi.restoreAllMocks()
   })
 
-  it('starts all four jobs and stops them cleanly', async () => {
+  it('starts all five jobs and stops them cleanly', async () => {
     const { startScheduler, stopScheduler, getScheduledJobs } = await import('../services/scheduler')
     startScheduler()
     const jobs = getScheduledJobs()
-    expect(jobs).toHaveLength(4)
-    expect(jobs.map((j) => j.name)).toEqual(['dailySummary', 'weeklySummary', 'monthlySummary', 'overdueReminders'])
+    expect(jobs).toHaveLength(5)
+    expect(jobs.map((j) => j.name)).toEqual(['dailySummary', 'weeklySummary', 'monthlySummary', 'overdueReminders', 'syncQueueCleanup'])
     expect(jobs.every((j) => j.active)).toBe(true)
 
     stopScheduler()
@@ -62,7 +62,7 @@ describe('Scheduler (Integration 7)', () => {
     const { startScheduler } = await import('../services/scheduler')
     startScheduler()
     startScheduler()
-    expect(cronTasks).toHaveLength(4)
+    expect(cronTasks).toHaveLength(5)
   })
 
   describe('queue mode (Redis configured)', () => {

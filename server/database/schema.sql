@@ -141,26 +141,26 @@ CREATE TABLE audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Indexes for performance
-CREATE INDEX idx_customers_business_id ON customers(business_id);
-CREATE INDEX idx_customers_name ON customers(name);
-CREATE INDEX idx_customers_phone ON customers(phone);
-CREATE INDEX idx_udhaar_business_id ON udhaar(business_id);
-CREATE INDEX idx_udhaar_customer_id ON udhaar(customer_id);
-CREATE INDEX idx_udhaar_due_date ON udhaar(due_date);
-CREATE INDEX idx_udhaar_remaining_amount ON udhaar(remaining_amount);
-CREATE INDEX idx_payments_business_id ON payments(business_id);
-CREATE INDEX idx_payments_customer_id ON payments(customer_id);
-CREATE INDEX idx_payments_date ON payments(date);
-CREATE INDEX idx_sales_business_id ON sales(business_id);
-CREATE INDEX idx_sales_customer_id ON sales(customer_id);
-CREATE INDEX idx_sales_date ON sales(date);
-CREATE INDEX idx_reminders_business_id ON reminders(business_id);
-CREATE INDEX idx_reminders_due_date ON reminders(due_date);
-CREATE INDEX idx_sync_queue_business_id ON sync_queue(business_id);
-CREATE INDEX idx_sync_queue_created_at ON sync_queue(created_at);
-CREATE INDEX idx_audit_logs_business_id ON audit_logs(business_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+-- Indexes for performance (IF NOT EXISTS for idempotent re-runs)
+CREATE INDEX IF NOT EXISTS idx_customers_business_id ON customers(business_id);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_udhaar_business_id ON udhaar(business_id);
+CREATE INDEX IF NOT EXISTS idx_udhaar_customer_id ON udhaar(customer_id);
+CREATE INDEX IF NOT EXISTS idx_udhaar_due_date ON udhaar(due_date);
+CREATE INDEX IF NOT EXISTS idx_udhaar_remaining_amount ON udhaar(remaining_amount);
+CREATE INDEX IF NOT EXISTS idx_payments_business_id ON payments(business_id);
+CREATE INDEX IF NOT EXISTS idx_payments_customer_id ON payments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(date);
+CREATE INDEX IF NOT EXISTS idx_sales_business_id ON sales(business_id);
+CREATE INDEX IF NOT EXISTS idx_sales_customer_id ON sales(customer_id);
+CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date);
+CREATE INDEX IF NOT EXISTS idx_reminders_business_id ON reminders(business_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_due_date ON reminders(due_date);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_business_id ON sync_queue(business_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_created_at ON sync_queue(created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_business_id ON audit_logs(business_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- Row Level Security (RLS) Policies
 ALTER TABLE businesses ENABLE ROW LEVEL SECURITY;

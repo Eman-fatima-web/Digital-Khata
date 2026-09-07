@@ -52,25 +52,37 @@ syncRouter.get('/pull', async (req: AuthenticatedRequest, res) => {
 
   const since = req.query.since as string | undefined
 
+  // Validate the 'since' parameter is a valid date string if provided
+  if (since && isNaN(Date.parse(since))) {
+    return res.status(400).json({ error: 'Invalid "since" date format' })
+  }
+
   try {
-    const tables = ['customers', 'udhaar', 'payments', 'sales'] as const
-    const tableResults = await Promise.all(tables.map(async (table) => {
-      let sql = `SELECT * FROM ${table} WHERE business_id = $1`
-      const params: unknown[] = [businessId]
+    // Whitelist of allowed syncable tables — never interpolate user input
+    const ALLOWED_TABLES = ['customers', 'udhaar', 'payments', 'sales'] as const
+    type SyncTable = typeof ALLOWED_TABLES[number]
 
-      if (since) {
-        sql += ` AND updated_at > $2`
-        params.push(new Date(since))
-      }
+    const tableResults = await Promise.all(
+      ALLOWED_TABLES.map(async (table: SyncTable) => {
+        // Build query with parameterized values — table name is from a
+        // compile-time constant array, never from user input.
+        let sql = `SELECT * FROM ${table} WHERE business_id = $1`
+        const params: unknown[] = [businessId]
 
-      sql += ` ORDER BY updated_at ASC LIMIT 500`
-      const result = await query(sql, params)
-      const mapper = rowMappers[table]
-      return result.rows.map((row: Record<string, unknown>) => ({
-        table,
-        record: mapper(row),
-      }))
-    }))
+        if (since) {
+          sql += ` AND updated_at > $2`
+          params.push(new Date(since))
+        }
+
+        sql += ` ORDER BY updated_at ASC LIMIT 500`
+        const result = await query(sql, params)
+        const mapper = rowMappers[table]
+        return result.rows.map((row: Record<string, unknown>) => ({
+          table,
+          record: mapper(row),
+        }))
+      })
+    )
 
     const records = tableResults.flat()
     res.json({ records })

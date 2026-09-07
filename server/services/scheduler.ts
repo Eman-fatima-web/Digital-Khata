@@ -6,9 +6,9 @@ import { enqueueJob } from '../queues/index.js'
 const log = createChildLogger({ module: 'scheduler' })
 
 interface ScheduledJob {
-  name: 'dailySummary' | 'weeklySummary' | 'monthlySummary' | 'overdueReminders'
+  name: 'dailySummary' | 'weeklySummary' | 'monthlySummary' | 'overdueReminders' | 'syncQueueCleanup'
   schedule: string
-  queue: 'email' | 'messaging'
+  queue: 'email' | 'messaging' | 'sync'
   jobType: string
   cronTask: ReturnType<typeof cron.schedule> | null
 }
@@ -18,6 +18,7 @@ const scheduledJobs: ScheduledJob[] = [
   { name: 'weeklySummary', schedule: '0 9 * * 1', queue: 'email', jobType: 'weekly-summary', cronTask: null },
   { name: 'monthlySummary', schedule: '0 9 1 * *', queue: 'email', jobType: 'monthly-summary', cronTask: null },
   { name: 'overdueReminders', schedule: '0 10 * * *', queue: 'messaging', jobType: 'overdue-reminders', cronTask: null },
+  { name: 'syncQueueCleanup', schedule: '0 3 * * 0', queue: 'sync', jobType: 'sync-queue-cleanup', cronTask: null },
 ]
 
 let running = false
@@ -76,12 +77,14 @@ export async function runScheduledJobNow(name: ScheduledJob['name']): Promise<vo
   const { runWeeklySummaryJob } = await import('./jobs/weeklySummary.js')
   const { runMonthlySummaryJob } = await import('./jobs/monthlySummary.js')
   const { runOverdueReminderJob } = await import('./jobs/overdueReminders.js')
+  const { runSyncQueueCleanupJob } = await import('./jobs/syncQueueCleanup.js')
 
   const runners: Record<ScheduledJob['name'], () => Promise<unknown>> = {
     dailySummary: runDailySummaryJob,
     weeklySummary: runWeeklySummaryJob,
     monthlySummary: runMonthlySummaryJob,
     overdueReminders: runOverdueReminderJob,
+    syncQueueCleanup: runSyncQueueCleanupJob,
   }
 
   await runners[job.name]()

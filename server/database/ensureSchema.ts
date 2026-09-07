@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
-import { query, isDatabaseAvailable } from './index.js'
+import { pool, query, isDatabaseAvailable } from './index.js'
 import { logger } from '../services/logger.js'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
@@ -115,8 +115,13 @@ export function splitStatements(sql: string): string[] {
 
 /**
  * Ensure core tables exist. Reads schema.sql and runs every statement
- * inside a transaction. If tables already exist the IF NOT EXISTS clauses
- * make it a no-op. Safe to call multiple times — only runs once per process.
+ * inside a single transaction. If tables already exist the IF NOT EXISTS
+ * clauses make it a no-op. Safe to call multiple times — only runs once
+ * per process.
+ *
+ * Readiness check verifies ALL expected tables exist (not just businesses)
+ * so a partial previous run is detected and the remaining statements are
+ * applied.
  */
 export async function ensureSchema(): Promise<void> {
   if (applied) return
@@ -125,21 +130,45 @@ export async function ensureSchema(): Promise<void> {
     return
   }
 
+  // Expected core tables — if any are missing we need to (re)run schema.sql
+  const EXPECTED_TABLES = [
+    'businesses', 'users', 'customers', 'udhaar', 'payments',
+    'sales', 'reminders', 'sync_queue', 'audit_logs',
+  ]
+
   try {
-    const exists = await query(
-      `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'businesses') AS t`,
+    // Check which expected tables actually exist
+    const tableCheckResult = await query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = ANY($1)`,
+      [EXPECTED_TABLES],
     )
-    if (exists.rows[0].t) {
-      logger.info('Schema already applied')
+    const existingTables = new Set(tableCheckResult.rows.map((r: { table_name: string }) => r.table_name))
+    const allExist = EXPECTED_TABLES.every((t) => existingTables.has(t))
+
+    if (allExist) {
+      logger.info('Schema already applied — all expected tables exist')
     } else {
-      logger.info('Applying schema.sql...')
+      const missing = EXPECTED_TABLES.filter((t) => !existingTables.has(t))
+      logger.info({ missing }, 'Applying schema.sql (missing tables detected)...')
       const sql = readFileSync(SCHEMA_PATH, 'utf-8')
       const stmts = splitStatements(sql)
 
-      for (const stmt of stmts) {
-        await query(stmt + ';')
+      // Use a real transaction so partial failure rolls back cleanly
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        for (const stmt of stmts) {
+          await client.query(stmt + ';')
+        }
+        await client.query('COMMIT')
+        logger.info({ count: stmts.length }, 'schema.sql applied successfully')
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw err
+      } finally {
+        client.release()
       }
-      logger.info({ count: stmts.length }, 'schema.sql applied')
     }
     applied = true
 
@@ -150,6 +179,6 @@ export async function ensureSchema(): Promise<void> {
       logger.error({ err }, 'Failed to run idempotent migrations')
     }
   } catch (err) {
-    logger.error({ err }, 'Failed to apply schema.sql')
+    logger.error({ err }, 'Failed to apply schema.sql — server will continue but data operations may fail')
   }
 }

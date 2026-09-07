@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt'
 import { randomUUID } from 'crypto'
 import { createHash } from 'crypto'
 import jwt from 'jsonwebtoken'
-import { generateToken, authenticateToken, JWT_SECRET, type AuthenticatedRequest } from '../middleware/auth.js'
+import { generateToken, authenticateToken, revokeToken, JWT_SECRET, type AuthenticatedRequest } from '../middleware/auth.js'
 import { createChildLogger } from '../services/logger.js'
 import { query, getClient, isDatabaseAvailable } from '../database/index.js'
 import { generateCsrfToken } from '../middleware/csrf.js'
@@ -64,6 +64,18 @@ authRouter.post('/refresh', async (req, res) => {
 })
 
 /**
+ * POST /api/auth/logout
+ * Revoke the current token so it cannot be reused even if still within its
+ * 7-day expiry window. The client should also clear its stored tokens.
+ */
+authRouter.post('/logout', authenticateToken, (req: AuthenticatedRequest, res) => {
+  if (req.tokenJti) {
+    revokeToken(req.tokenJti)
+  }
+  res.json({ success: true })
+})
+
+/**
  * GET /api/auth/csrf-token
  * Returns a CSRF token for the client to include in state-changing requests
  */
@@ -103,6 +115,11 @@ authRouter.post('/login', async (req, res) => {
 
     if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Email and password required' })
+    }
+
+    // Reject abnormally large requests (defense in depth)
+    if (email.length > 500 || password.length > 1000) {
+      return res.status(413).json({ error: 'Request body too large' })
     }
 
     const normalizedEmail = email.trim().toLowerCase()
@@ -482,6 +499,14 @@ const resetRateLimits = new Map<string, { count: number; resetAt: number }>()
 
 function checkResetRateLimit(email: string): boolean {
   const now = Date.now()
+  // Lazy eviction: prune stale entries when the map grows too large
+  if (resetRateLimits.size > 100) {
+    for (const [id, item] of resetRateLimits.entries()) {
+      if (now > item.resetAt) {
+        resetRateLimits.delete(id)
+      }
+    }
+  }
   const entry = resetRateLimits.get(email)
   if (!entry || now > entry.resetAt) {
     resetRateLimits.set(email, { count: 1, resetAt: now + 3600_000 })
@@ -540,7 +565,8 @@ authRouter.post('/forgot-password', async (req, res) => {
       await sendMail(user.email, 'Reset your password — Digital Khata', html)
       res.json({
         sent: true,
-        ...(!transporter ? { devResetUrl: resetUrl } : {}),
+        // Never leak the reset URL in production — only expose it for local dev without SMTP
+        ...(process.env.NODE_ENV !== 'production' && !transporter ? { devResetUrl: resetUrl } : {}),
       })
     } else {
       const user = findUserByEmail(email)
@@ -570,7 +596,7 @@ authRouter.post('/forgot-password', async (req, res) => {
       await sendMail(user.email, 'Reset your password — Digital Khata', html)
       res.json({
         sent: true,
-        ...(!transporter ? { devResetUrl: resetUrl } : {}),
+        ...(process.env.NODE_ENV !== 'production' && !transporter ? { devResetUrl: resetUrl } : {}),
       })
     }
   } catch (error) {
@@ -668,25 +694,29 @@ authRouter.post('/reset-with-pin', async (req, res) => {
 
     const useDb = await isDatabaseAvailable()
 
+    // Generic error messages to prevent user enumeration
+    const GENERIC_ERROR = 'Invalid email or recovery PIN'
+
     if (useDb) {
       const result = await query(
         `SELECT id, recovery_pin_hash FROM users WHERE LOWER(TRIM(email)) = $1`,
         [normalizedEmail]
       )
       if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'No account found with that email' })
+        // Constant-time delay to prevent timing-based enumeration
+        await bcrypt.compare('dummy', '$2b$10$dummyhashfortimingprotection0000000000000000000000')
+        return res.status(400).json({ error: GENERIC_ERROR })
       }
 
       const user = result.rows[0]
       if (!user.recovery_pin_hash) {
-        return res.status(400).json({
-          error: 'No recovery PIN set for this account. Set one from Profile > Recovery PIN.',
-        })
+        await bcrypt.compare('dummy', '$2b$10$dummyhashfortimingprotection0000000000000000000000')
+        return res.status(400).json({ error: GENERIC_ERROR })
       }
 
       const pinOk = await bcrypt.compare(pin.trim(), user.recovery_pin_hash)
       if (!pinOk) {
-        return res.status(400).json({ error: 'Incorrect recovery PIN' })
+        return res.status(400).json({ error: GENERIC_ERROR })
       }
 
       const passwordHash = await bcrypt.hash(password, 10)
@@ -702,7 +732,8 @@ authRouter.post('/reset-with-pin', async (req, res) => {
       if (result.success) {
         res.json({ success: true })
       } else {
-        res.status(400).json({ error: result.error || 'Failed to reset password' })
+        // Generic error to prevent user enumeration (same as DB path)
+        res.status(400).json({ error: 'Invalid email or recovery PIN' })
       }
     }
   } catch (error) {

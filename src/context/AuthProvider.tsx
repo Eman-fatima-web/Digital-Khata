@@ -32,7 +32,7 @@ type AuthState = {
 type AuthContextValue = AuthState & {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, fullName?: string, phone?: string, address?: string, cnic?: string, businessName?: string, recoveryPin?: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   isAuthenticated: boolean
   isAdmin: boolean
   isSuperAdmin: boolean
@@ -76,8 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(() => {
-    apiLogout()
+  const logout = useCallback(async () => {
+    await apiLogout()
     setState({ user: null, token: null, isLoading: false })
   }, [])
 

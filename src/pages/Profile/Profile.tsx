@@ -317,8 +317,8 @@ export default function Profile() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                logout()
+              onClick={async () => {
+                await logout()
                 navigate('/login')
               }}
               className="text-danger hover:bg-danger/10 border-danger/20 gap-1.5"

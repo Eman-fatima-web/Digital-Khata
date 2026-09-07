@@ -26,7 +26,7 @@ describe('Scheduler', () => {
 
     startScheduler()
     const jobs = getScheduledJobs()
-    expect(jobs).toHaveLength(4)
+    expect(jobs).toHaveLength(5)
     expect(jobs[0].name).toBe('dailySummary')
     expect(jobs[0].schedule).toBe('0 9 * * *')
     expect(jobs[0].active).toBe(true)
@@ -39,6 +39,9 @@ describe('Scheduler', () => {
     expect(jobs[3].name).toBe('overdueReminders')
     expect(jobs[3].schedule).toBe('0 10 * * *')
     expect(jobs[3].active).toBe(true)
+    expect(jobs[4].name).toBe('syncQueueCleanup')
+    expect(jobs[4].schedule).toBe('0 3 * * 0')
+    expect(jobs[4].active).toBe(true)
 
     stopScheduler()
     const afterStop = getScheduledJobs()

@@ -163,11 +163,20 @@ export async function register(
 }
 
 /**
- * Logout
+ * Logout — revoke the server-side token and clear local auth state.
  */
-export function logout(): void {
-  clearAuthTokens()
-  resetCsrfToken()
+export async function logout(): Promise<void> {
+  try {
+    const tokens = loadAuthTokens()
+    if (tokens) {
+      await authenticatedRequest('/api/auth/logout', { method: 'POST' })
+    }
+  } catch {
+    // Best-effort: clear tokens even if the server call fails (offline, network error)
+  } finally {
+    clearAuthTokens()
+    resetCsrfToken()
+  }
 }
 
 /**

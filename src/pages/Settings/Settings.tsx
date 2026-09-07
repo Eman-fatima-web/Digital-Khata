@@ -578,8 +578,8 @@ function Settings() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      logout()
+                    onClick={async () => {
+                      await logout()
                       navigate('/login')
                     }}
                   >
