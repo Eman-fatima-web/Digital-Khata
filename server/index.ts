@@ -29,8 +29,17 @@ import { ensureSchema } from './database/ensureSchema.js'
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Vercel serverless detection
+const isVercel = Boolean(process.env.VERCEL) || (process.env.NODE_ENV === 'production' && !process.env.PORT)
+
 // Apply schema.sql automatically on first start (idempotent IF NOT EXISTS).
-await ensureSchema()
+// In Vercel serverless, skip blocking schema check — run it lazily on first request.
+if (!isVercel) {
+  await ensureSchema()
+} else {
+  // Vercel serverless: schema check will run on first API request
+  logger.info('Vercel serverless mode — schema check deferred to first request')
+}
 
 // Trust the first proxy hop so rate limiting keys off the real client IP
 // behind a reverse proxy / load balancer in production.
@@ -208,9 +217,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   })
 })
 
-// Vercel serverless detection
-const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && !process.env.PORT
-
+// Vercel serverless: app.listen is a no-op
 app.listen = function(...args: any[]) {
   // In serverless environments, skip listen
   if (isVercel) {
