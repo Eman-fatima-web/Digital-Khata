@@ -1,26 +1,14 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "server/index.ts",
-      "use": "@vercel/node"
-    }
-  ],
+  "framework": "vite",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server/index.ts"
+      "destination": "/api/$1"
     },
     {
       "source": "/health(.*)",
-      "destination": "/server/index.ts"
+      "destination": "/api/health$1"
     }
   ],
   "env": {
